@@ -296,6 +296,12 @@ hr{border:none;border-top:1px solid rgba(255,255,255,.1);margin:.3rem 0}
 <div><label>Subject</label><input id="subject"></div>
 <div><label>Message</label><textarea id="body"></textarea></div>
 <button class="go" id="send">Send broadcast</button><div id="msg"></div>
+<a class="back" href="/admin/preview" target="_blank" style="margin-bottom:.2rem">✉ preview the new-song email</a>
+<hr>
+<p class="hint">Import subscribers — paste emails (any format) or choose a .csv file. Only add people who opted in.</p>
+<div><textarea id="csv" placeholder="alice@example.com, bob@example.com …" style="min-height:80px"></textarea></div>
+<input id="csvfile" type="file" accept=".csv,text/csv,text/plain" style="color:rgba(255,255,255,.6);font-size:.8rem">
+<button class="go" id="import">Import CSV</button><div id="imsg"></div>
 <a class="back" href="https://bedtimetunes.com">← back to the player</a></div>
 <script>
 var $=function(i){return document.getElementById(i)};
@@ -307,6 +313,15 @@ $('send').addEventListener('click',async function(){
   try{var r=await fetch('/api/broadcast',{method:'POST',credentials:'include',body:fd});var d=await r.json();
   $('msg').textContent=r.ok?('Sent to '+d.sent+' of '+d.total):(d.error||'Error '+r.status);}
   catch(e){$('msg').textContent='Network error';}
+});
+$('import').addEventListener('click',async function(){
+  var file=$('csvfile').files[0];var fd=new FormData();
+  if(file)fd.append('file',file);else fd.append('csv',$('csv').value);
+  if(!file&&!$('csv').value.trim()){$('imsg').textContent='Paste emails or choose a file';return;}
+  $('imsg').textContent='Importing…';
+  try{var r=await fetch('/api/import',{method:'POST',credentials:'include',body:fd});var d=await r.json();
+  $('imsg').textContent=r.ok?('Added '+d.added+', skipped '+d.skipped+' duplicate(s) — '+d.parsed+' valid email(s) found'):(d.error||'Error '+r.status);}
+  catch(e){$('imsg').textContent='Network error';}
 });
 </script></body></html>`;
 }
@@ -389,6 +404,38 @@ export default {
       if (bad) return new Response(bad, { status: 403 });
       const { results } = await env.DB.prepare(`SELECT id, email, created_at, unsubscribed FROM subscribers ORDER BY id DESC`).all();
       return new Response(usersPage(results || []), { headers: { 'content-type': 'text/html;charset=utf-8' } });
+    }
+
+    if (path === '/admin/preview' && request.method === 'GET') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(bad, { status: 403 });
+      const sample = { id: 19, title: 'Black Hair', artist: 'Nick Cave & The Bad Seeds' };
+      const { html } = newSongEmail(sample, 'https://audio.bedtimetunes.com/unsubscribe?t=PREVIEW');
+      return new Response(html, { headers: { 'content-type': 'text/html;charset=utf-8' } });
+    }
+
+    if (path === '/api/import' && request.method === 'POST') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(JSON.stringify({ error: bad }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
+      let raw = '';
+      const ct = request.headers.get('content-type') || '';
+      if (ct.includes('multipart/form-data')) {
+        const f = await request.formData();
+        const file = f.get('file');
+        raw = (file && file.size) ? await file.text() : (f.get('csv') || '').toString();
+      } else {
+        const b = await request.json().catch(() => ({}));
+        raw = (b.csv || '').toString();
+      }
+      const emails = [...new Set((raw.match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/gi) || []).map(e => e.toLowerCase()))];
+      const now = new Date().toISOString();
+      const stmt = env.DB.prepare(`INSERT INTO subscribers (email, created_at, token, unsubscribed) VALUES (?,?,?,0) ON CONFLICT(email) DO NOTHING`);
+      let added = 0;
+      for (const e of emails) {
+        const r = await stmt.bind(e, now, newToken()).run();
+        if (r.meta && r.meta.changes) added += r.meta.changes;
+      }
+      return Response.json({ parsed: emails.length, added, skipped: emails.length - added }, { headers: cors(env) });
     }
 
     if (path === '/api/broadcast' && request.method === 'POST') {
