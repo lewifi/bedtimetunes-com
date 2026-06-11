@@ -11,7 +11,7 @@ database_id = "f3c824f9-88a9-401c-b148-281589c6cb65"
 ALLOWED_ORIGIN  = "https://bedtimetunes.com"
 ALLOWED_REFERER = "bedtimetunes.com"
 B2_ENDPOINT     = "https://s3.us-west-004.backblazeb2.com"
-B2_BUCKET       = "bedtimetunes-audio"
+B2_BUCKET       = "bedtimetunes"
 DEFAULT_UPLOADER = "2"
 # email -> uploader id, for contributors who add via /add (Cloudflare Access identity)
 CONTRIBUTORS = "{\"lewi@ephix.net\":2,\"antisubliminal@gmail.com\":4}"

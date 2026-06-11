@@ -11,9 +11,9 @@
 #>
 
 # ───────────────────────── CONFIG ─────────────────────────
-$LocalFolder = "C:\bedtimetunes\mp3"                       # folder of source .mp3 files
+$LocalFolder = "C:\Users\lewi\Dev\bedtimetunes.com\songs"   # your /songs
 $B2_Endpoint = "https://s3.us-west-004.backblazeb2.com"     # your B2 region endpoint
-$B2_Bucket   = "bedtimetunes-audio"
+$B2_Bucket   = "bedtimetunes"
 $B2_KeyId    = $env:B2_KEY_ID      # set these as env vars; never hard-code keys
 $B2_AppKey   = $env:B2_APP_KEY
 $SyncUrl     = "https://audio.bedtimetunes.com/api/sync"
