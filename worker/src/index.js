@@ -256,7 +256,7 @@ async function emailList(env, subject, render) {
   return { sent, total: results.length };
 }
 
-function mailShell(inner, unsub) {
+function mailShell(inner, unsub, pixel) {
   return `<!doctype html><html><body style="margin:0;padding:0;background:#0d0510">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0510"><tr><td align="center" style="padding:28px 16px">
 <table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#160a1a;border:1px solid #2a1830;border-radius:16px">
@@ -265,22 +265,24 @@ function mailShell(inner, unsub) {
 <span style="font-size:13px;letter-spacing:3px;text-transform:uppercase;color:#c2416b;font-weight:bold;vertical-align:middle">Bedtime Tunes</span></td></tr>
 <tr><td style="padding:16px 28px 26px;font-family:Arial,sans-serif;color:#e8dce8;font-size:15px;line-height:1.6">${inner}</td></tr>
 <tr><td style="padding:0 28px 24px;font-family:Arial,sans-serif;color:#6b5b6b;font-size:11px;line-height:1.5">You're receiving this because you subscribed to Bedtime Tunes updates.<br><a href="${unsub}" style="color:#9a6b85">Unsubscribe</a></td></tr>
+${pixel ? `<tr><td style="font-size:0;line-height:0"><img src="https://audio.bedtimetunes.com/o.gif?${pixel}" width="1" height="1" alt="" style="display:block;border:0"></td></tr>` : ''}
 </table></td></tr></table></body></html>`;
 }
 
 function newSongEmail(track, unsub) {
   const play = `https://audio.bedtimetunes.com/s/${track.id}-${slugify(track.artist)}-${slugify(track.title)}`;
-  const cover = track.art ? `<div style="text-align:center;margin:0 0 18px"><a href="${play}"><img src="${track.art}" width="200" height="200" alt="" style="border-radius:14px;border:1px solid #2a1830;max-width:200px;height:auto"></a></div>` : '';
+  const click = `https://audio.bedtimetunes.com/r?e=email_click&t=${track.id}&u=${encodeURIComponent(play)}`;
+  const cover = track.art ? `<div style="text-align:center;margin:0 0 18px"><a href="${click}"><img src="${track.art}" width="200" height="200" alt="" style="border-radius:14px;border:1px solid #2a1830;max-width:200px;height:auto"></a></div>` : '';
   const inner = `<p style="margin:0 0 8px;color:#9a8a9a;font-size:12px;letter-spacing:2px;text-transform:uppercase">A new tune was added</p>
 ${cover}<h1 style="margin:0 0 4px;font-size:24px;color:#ffffff">${xml(track.title)}</h1>
 <p style="margin:0 0 22px;color:#b9a9b9;font-size:14px;letter-spacing:1px">${xml(track.artist)}</p>
-<a href="${play}" style="display:inline-block;background:#c2416b;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:100px;font-size:13px;letter-spacing:2px;text-transform:uppercase">&#9654; Listen now</a>`;
-  return { html: mailShell(inner, unsub), text: `A new tune on Bedtime Tunes:\n${track.title} — ${track.artist}\n\nListen: ${play}\n\nUnsubscribe: ${unsub}` };
+<a href="${click}" style="display:inline-block;background:#c2416b;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:100px;font-size:13px;letter-spacing:2px;text-transform:uppercase">&#9654; Listen now</a>`;
+  return { html: mailShell(inner, unsub, `t=${track.id}`), text: `A new tune on Bedtime Tunes:\n${track.title} — ${track.artist}\n\nListen: ${play}\n\nUnsubscribe: ${unsub}` };
 }
 
 function broadcastEmail(body, unsub) {
   const safe = xml(body).replace(/\n/g, '<br>');
-  return { html: mailShell(`<div style="font-size:15px;line-height:1.6;color:#e8dce8">${safe}</div>`, unsub), text: `${body}\n\nUnsubscribe: ${unsub}` };
+  return { html: mailShell(`<div style="font-size:15px;line-height:1.6;color:#e8dce8">${safe}</div>`, unsub, 'c=broadcast'), text: `${body}\n\nUnsubscribe: ${unsub}` };
 }
 
 function adminPage(count) {
@@ -296,6 +298,7 @@ hr{border:none;border-top:1px solid rgba(255,255,255,.1);margin:.3rem 0}
 <body><div class="card"><h1>Admin</h1>
 <a class="go" href="/add">♪ Add a tune</a>
 <div class="row"><a class="go" href="/admin/new-user">＋ Curator</a><a class="go" href="/admin/users">👥 Subscribers (${count})</a></div>
+<a class="go" href="/admin/stats">📊 View stats</a>
 <hr>
 <p class="hint">Broadcast a custom email to all ${count} subscribers.</p>
 <div><label>Subject</label><input id="subject"></div>
@@ -335,6 +338,41 @@ $('import').addEventListener('click',async function(){
   if(d)$('imsg').textContent='Added '+d.added+', skipped '+d.skipped+' duplicate(s) — '+d.parsed+' valid email(s) found';
 });
 </script></body></html>`;
+}
+
+function statsPage(d) {
+  const card = (label, val) => `<div class="stat"><div class="num">${val}</div><div class="lbl">${label}</div></div>`;
+  const counts = Object.fromEntries((d.byType || []).map(r => [r.type, r.n]));
+  const playRows = (d.topPlays || []).map(r => `<tr><td>${r.title ? xml(r.title) : '#' + (r.track_id ?? '—')}</td><td>${r.artist ? xml(r.artist) : ''}</td><td style="text-align:right">${r.n}</td></tr>`).join('') || '<tr><td colspan="3" style="color:rgba(255,255,255,.4)">No plays yet.</td></tr>';
+  const recentRows = (d.recent || []).map(r => `<tr><td>${(r.ts || '').slice(0, 16).replace('T', ' ')}</td><td>${r.type}</td><td>${r.track_id ?? ''}</td><td>${r.meta ? xml(r.meta) : ''}</td></tr>`).join('') || '<tr><td colspan="4" style="color:rgba(255,255,255,.4)">Nothing yet.</td></tr>';
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Stats · Bedtime Tunes</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
+<style>${FORM_CSS}
+.card{max-width:820px}
+.stats{display:flex;flex-wrap:wrap;gap:.6rem;width:100%}
+.stat{flex:1;min-width:90px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:.8rem;text-align:center}
+.stat .num{font-family:'Barlow';font-weight:700;font-size:1.5rem;color:#fff}
+.stat .lbl{font-family:'Barlow';font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-top:.2rem}
+h2{font-family:'Barlow';font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.5);margin:1.2rem 0 .4rem;width:100%}
+table{width:100%;border-collapse:collapse;font-size:.82rem}
+th,td{text-align:left;padding:.4rem .55rem;border-bottom:1px solid rgba(255,255,255,.08)}
+th{font-family:'Barlow';font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+.back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem}</style></head>
+<body><div class="card"><h1>Stats</h1>
+<div class="stats">
+${card('plays', counts.play || 0)}
+${card('shares', counts.share || 0)}
+${card('yt switches', counts.switch || 0)}
+${card('subscribes', counts.subscribe || 0)}
+${card('email clicks', counts.email_click || 0)}
+${card('email opens', counts.email_open || 0)}
+</div>
+<h2>Most played</h2>
+<table><thead><tr><th>Title</th><th>Artist</th><th style="text-align:right">Plays</th></tr></thead><tbody>${playRows}</tbody></table>
+<h2>Recent activity</h2>
+<table><thead><tr><th>When (UTC)</th><th>Event</th><th>Track</th><th>Meta</th></tr></thead><tbody>${recentRows}</tbody></table>
+<a class="back" href="/admin" style="display:inline-block;margin-top:1rem">← back to admin</a></div></body></html>`;
 }
 
 function usersPage(rows) {
@@ -461,6 +499,17 @@ export default {
       else if (action === 'restore') await env.DB.prepare(`UPDATE subscribers SET unsubscribed=0, bounced=0 WHERE id=?`).bind(id).run();
       else return new Response(JSON.stringify({ error: 'bad action' }), { status: 400, headers: { ...cors(env), 'content-type': 'application/json' } });
       return Response.json({ ok: true }, { headers: cors(env) });
+    }
+
+    if (path === '/admin/stats' && request.method === 'GET') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(bad, { status: 403 });
+      const [byType, topPlays, recent] = await Promise.all([
+        env.DB.prepare(`SELECT type, COUNT(*) n FROM events GROUP BY type`).all().catch(() => ({ results: [] })),
+        env.DB.prepare(`SELECT e.track_id, t.title, t.artist, COUNT(*) n FROM events e LEFT JOIN tunes t ON t.id=e.track_id WHERE e.type='play' GROUP BY e.track_id ORDER BY n DESC LIMIT 10`).all().catch(() => ({ results: [] })),
+        env.DB.prepare(`SELECT ts, type, track_id, meta FROM events ORDER BY id DESC LIMIT 30`).all().catch(() => ({ results: [] })),
+      ]);
+      return new Response(statsPage({ byType: byType.results, topPlays: topPlays.results, recent: recent.results }), { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
     if (path === '/admin/preview' && request.method === 'GET') {
@@ -598,6 +647,45 @@ export default {
       return Response.json({ id: nextId, by: email, uploader, mp3_key, art_key, notified: notify, ...src }, { headers: cors(env) });
     }
 
+    // ── analytics: event beacon (site), click redirect + open pixel (email) ──
+    if (path === '/api/event' && request.method === 'POST') {
+      let b = {};
+      try { b = JSON.parse(await request.text()); } catch (e) {}
+      const allowed = ['play', 'switch', 'share', 'page', 'subscribe', 'email_click', 'email_open'];
+      const type = (b.type || '').toString();
+      if (!allowed.includes(type)) return new Response(null, { status: 204, headers: cors(env) });
+      const tid = b.track_id ? parseInt(b.track_id, 10) : null;
+      const meta = b.meta ? String(b.meta).slice(0, 200) : null;
+      try {
+        await env.DB.prepare(`INSERT INTO events (ts,type,track_id,meta,country) VALUES (?,?,?,?,?)`)
+          .bind(new Date().toISOString(), type, Number.isNaN(tid) ? null : tid, meta, (request.cf && request.cf.country) || null).run();
+      } catch (e) {}
+      return new Response(null, { status: 204, headers: cors(env) });
+    }
+
+    if (path === '/r' && request.method === 'GET') {
+      const u = url.searchParams.get('u') || '';
+      const e = (url.searchParams.get('e') || 'email_click').slice(0, 20);
+      const t = url.searchParams.get('t');
+      let dest = 'https://bedtimetunes.com';
+      try { const d = new URL(u); if (d.hostname === 'bedtimetunes.com' || d.hostname === 'audio.bedtimetunes.com') dest = d.toString(); } catch (_) {}
+      try {
+        await env.DB.prepare(`INSERT INTO events (ts,type,track_id,meta,country) VALUES (?,?,?,?,?)`)
+          .bind(new Date().toISOString(), e, t ? parseInt(t, 10) : null, 'email', (request.cf && request.cf.country) || null).run();
+      } catch (_) {}
+      return Response.redirect(dest, 302);
+    }
+
+    if (path === '/o.gif' && request.method === 'GET') {
+      const t = url.searchParams.get('t'), c = url.searchParams.get('c');
+      try {
+        await env.DB.prepare(`INSERT INTO events (ts,type,track_id,meta) VALUES (?,?,?,?)`)
+          .bind(new Date().toISOString(), 'email_open', t ? parseInt(t, 10) : null, (c || 'email').slice(0, 60)).run();
+      } catch (_) {}
+      const gif = Uint8Array.from(atob('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'), x => x.charCodeAt(0));
+      return new Response(gif, { headers: { 'content-type': 'image/gif', 'Cache-Control': 'no-store, max-age=0', ...cors(env) } });
+    }
+
     // ── mailing list: public subscribe / unsubscribe ──
     if (path === '/api/subscribe' && request.method === 'POST') {
       let email = '';
@@ -610,6 +698,7 @@ export default {
       await env.DB.prepare(`INSERT INTO subscribers (email, created_at, token, unsubscribed) VALUES (?,?,?,0)
                             ON CONFLICT(email) DO UPDATE SET unsubscribed=0`)
         .bind(email, new Date().toISOString(), newToken()).run();
+      try { await env.DB.prepare(`INSERT INTO events (ts,type,meta,country) VALUES (?,?,?,?)`).bind(new Date().toISOString(), 'subscribe', 'site', (request.cf && request.cf.country) || null).run(); } catch (e) {}
       return Response.json({ ok: true }, { headers: cors(env) });
     }
 
