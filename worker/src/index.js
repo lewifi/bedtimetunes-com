@@ -220,11 +220,30 @@ $('go').addEventListener('click',async function(){
 });
 </script></body></html>`;
 
+const LANDING_PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bedtime Tunes · curator tools</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
+<style>${FORM_CSS}
+.card{text-align:center;align-items:center}
+a.go{display:block;text-decoration:none;width:100%}
+.brand small{display:block;font-size:.5rem;letter-spacing:.3em;opacity:.4;margin-top:.4rem;text-transform:uppercase}
+.back{color:rgba(255,255,255,.5);font-size:.8rem;margin-top:.6rem;text-decoration:none}.back:hover{color:#fff}</style></head>
+<body><div class="card">
+<h1 class="brand">Bedtime Tunes<small>curator tools</small></h1>
+<p class="hint">Add tunes to the collection, or set up a new curator.</p>
+<a class="go" href="/add">♪ Add a tune</a>
+<a class="go" href="/new-user">＋ Add a curator</a>
+<a class="back" href="https://bedtimetunes.com">← back to the player</a>
+</div></body></html>`;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors(env) });
+
+    if (path === '/' && request.method === 'GET')
+      return new Response(LANDING_PAGE, { headers: { 'content-type': 'text/html;charset=utf-8' } });
 
     if (path === '/add' && request.method === 'GET')
       return new Response(ADD_PAGE, { headers: { 'content-type': 'text/html;charset=utf-8' } });
