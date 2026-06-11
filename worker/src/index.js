@@ -244,7 +244,7 @@ const newToken = () => crypto.randomUUID().replace(/-/g, '');
 // send one templated email to every active subscriber (graceful no-op if EMAIL unset)
 async function emailList(env, subject, render) {
   if (!env.EMAIL) return { sent: 0, total: 0, note: 'EMAIL binding not configured' };
-  const { results } = await env.DB.prepare(`SELECT email, token FROM subscribers WHERE COALESCE(unsubscribed,0)=0`).all();
+  const { results } = await env.DB.prepare(`SELECT email, token FROM subscribers WHERE COALESCE(unsubscribed,0)=0 AND COALESCE(bounced,0)=0`).all();
   let sent = 0;
   for (const s of results) {
     const unsub = `https://audio.bedtimetunes.com/unsubscribe?t=${s.token}`;
@@ -305,46 +305,84 @@ hr{border:none;border-top:1px solid rgba(255,255,255,.1);margin:.3rem 0}
 <a class="back" href="https://bedtimetunes.com">← back to the player</a></div>
 <script>
 var $=function(i){return document.getElementById(i)};
+async function post(url,fd,el){
+  el.textContent='Working…';
+  try{
+    var r=await fetch(url,{method:'POST',credentials:'include',body:fd,redirect:'manual'});
+    if(r.type==='opaqueredirect'||r.status===0){el.textContent='Your admin session expired — reload this page to sign in again.';return null;}
+    var t=await r.text(),d={};try{d=JSON.parse(t)}catch(e){}
+    if(!r.ok){el.textContent=d.error?d.error:('Error '+r.status+' — '+t.slice(0,100));return null;}
+    return d;
+  }catch(e){el.textContent='Request failed: '+(e&&e.message?e.message:e);return null;}
+}
 $('send').addEventListener('click',async function(){
   if(!$('subject').value||!$('body').value){$('msg').textContent='Subject and message required';return;}
   if(!confirm('Send to ${count} subscribers?'))return;
-  $('msg').textContent='Sending…';
   var fd=new FormData();fd.append('subject',$('subject').value);fd.append('body',$('body').value);
-  try{var r=await fetch('/api/broadcast',{method:'POST',credentials:'include',body:fd});var d=await r.json();
-  $('msg').textContent=r.ok?('Sent to '+d.sent+' of '+d.total):(d.error||'Error '+r.status);}
-  catch(e){$('msg').textContent='Network error';}
+  var d=await post('/api/broadcast',fd,$('msg'));
+  if(d)$('msg').textContent='Sent to '+d.sent+' of '+d.total;
 });
 $('import').addEventListener('click',async function(){
-  var file=$('csvfile').files[0];var fd=new FormData();
+  var file=$('csvfile').files[0],fd=new FormData();
   if(file)fd.append('file',file);else fd.append('csv',$('csv').value);
   if(!file&&!$('csv').value.trim()){$('imsg').textContent='Paste emails or choose a file';return;}
-  $('imsg').textContent='Importing…';
-  try{var r=await fetch('/api/import',{method:'POST',credentials:'include',body:fd});var d=await r.json();
-  $('imsg').textContent=r.ok?('Added '+d.added+', skipped '+d.skipped+' duplicate(s) — '+d.parsed+' valid email(s) found'):(d.error||'Error '+r.status);}
-  catch(e){$('imsg').textContent='Network error';}
+  var d=await post('/api/import',fd,$('imsg'));
+  if(d)$('imsg').textContent='Added '+d.added+', skipped '+d.skipped+' duplicate(s) — '+d.parsed+' valid email(s) found';
 });
 </script></body></html>`;
 }
 
 function usersPage(rows) {
-  const trs = rows.map(r => `<tr><td>${r.id}</td><td>${xml(r.email)}</td><td>${(r.created_at || '').slice(0, 10)}</td><td>${r.unsubscribed ? '<span style="color:#9a6b6b">unsubscribed</span>' : '<span style="color:#7bbf7b">active</span>'}</td></tr>`).join('');
-  const active = rows.filter(r => !r.unsubscribed).length;
+  const status = (r) => r.bounced ? '<span style="color:#caa15a">bounced</span>' : (r.unsubscribed ? '<span style="color:#9a6b6b">unsubscribed</span>' : '<span style="color:#7bbf7b">active</span>');
+  const trs = rows.map(r => `<tr data-id="${r.id}"><td>${r.id}</td><td>${xml(r.email)}</td><td>${(r.created_at || '').slice(0, 10)}</td><td>${status(r)}</td>
+<td style="white-space:nowrap">${(r.unsubscribed || r.bounced) ? `<button class="act" data-a="restore">restore</button>` : `<button class="act" data-a="bounce">bounce</button>`} <button class="act danger" data-a="remove">remove</button></td></tr>`).join('');
+  const active = rows.filter(r => !r.unsubscribed && !r.bounced).length;
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Subscribers · Bedtime Tunes</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
 <style>${FORM_CSS}
-.card{max-width:680px}
+.card{max-width:760px}
 table{width:100%;border-collapse:collapse;font-size:.85rem}
 th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid rgba(255,255,255,.08)}
 th{font-family:'Barlow';font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+.act{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);border-radius:7px;font-size:.7rem;padding:.2rem .5rem;cursor:pointer}
+.act:hover{background:rgba(255,255,255,.12);color:#fff}
+.act.danger:hover{background:rgba(194,65,107,.3);border-color:rgba(194,65,107,.7)}
 .back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem}</style></head>
 <body><div class="card"><h1>Subscribers</h1>
 <p class="hint">${active} active · ${rows.length} total</p>
-<table><thead><tr><th>#</th><th>Email</th><th>Joined</th><th>Status</th></tr></thead><tbody>${trs || '<tr><td colspan="4" style="color:rgba(255,255,255,.4)">No subscribers yet.</td></tr>'}</tbody></table>
-<a class="back" href="/admin">← back to admin</a></div></body></html>`;
+<table><thead><tr><th>#</th><th>Email</th><th>Joined</th><th>Status</th><th></th></tr></thead><tbody>${trs || '<tr><td colspan="5" style="color:rgba(255,255,255,.4)">No subscribers yet.</td></tr>'}</tbody></table>
+<a class="back" href="/admin">← back to admin</a></div>
+<script>
+document.querySelectorAll('.act').forEach(function(b){b.addEventListener('click',async function(){
+  var tr=b.closest('tr'),id=tr.getAttribute('data-id'),a=b.getAttribute('data-a');
+  if(a==='remove'&&!confirm('Remove this subscriber permanently?'))return;
+  b.textContent='…';
+  var fd=new FormData();fd.append('id',id);fd.append('action',a);
+  try{var r=await fetch('/api/subscriber',{method:'POST',credentials:'include',body:fd,redirect:'manual'});
+    if(r.type==='opaqueredirect'||r.status===0){alert('Session expired — reload to sign in again.');return;}
+    if(r.ok)location.reload();else alert('Error '+r.status);
+  }catch(e){alert('Request failed: '+e.message);}
+});});
+</script></body></html>`;
 }
 
 export default {
+  async email(message, env, ctx) {
+    // Auto-suppress bounced addresses. Route your sender/bounce address to this
+    // Worker via Email Routing, and hard-bounce DSNs will mark subscribers bounced.
+    try {
+      const raw = await new Response(message.raw).text();
+      // pull the failed recipient from common DSN headers, else any address in the body
+      const m = raw.match(/(?:Final-Recipient|Original-Recipient|X-Failed-Recipients)\s*:\s*(?:rfc822;)?\s*([a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,})/i)
+        || raw.match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/i);
+      if (m) {
+        const bad = (m[1] || m[0]).toLowerCase();
+        await env.DB.prepare(`UPDATE subscribers SET bounced=1 WHERE lower(email)=?`).bind(bad).run();
+      }
+    } catch (e) {}
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -395,15 +433,29 @@ export default {
     if (path === '/admin' && request.method === 'GET') {
       const bad = ownerOnly(request);
       if (bad) return new Response(bad, { status: 403 });
-      const c = await env.DB.prepare(`SELECT COUNT(*) n FROM subscribers WHERE COALESCE(unsubscribed,0)=0`).first().catch(() => null);
+      const c = await env.DB.prepare(`SELECT COUNT(*) n FROM subscribers WHERE COALESCE(unsubscribed,0)=0 AND COALESCE(bounced,0)=0`).first().catch(() => null);
       return new Response(adminPage(c ? c.n : 0), { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
     if (path === '/users' && request.method === 'GET') {
       const bad = ownerOnly(request);
       if (bad) return new Response(bad, { status: 403 });
-      const { results } = await env.DB.prepare(`SELECT id, email, created_at, unsubscribed FROM subscribers ORDER BY id DESC`).all();
+      const { results } = await env.DB.prepare(`SELECT id, email, created_at, unsubscribed, bounced FROM subscribers ORDER BY id DESC`).all();
       return new Response(usersPage(results || []), { headers: { 'content-type': 'text/html;charset=utf-8' } });
+    }
+
+    if (path === '/api/subscriber' && request.method === 'POST') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(JSON.stringify({ error: bad }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
+      const f = await request.formData();
+      const id = parseInt(f.get('id'), 10);
+      const action = (f.get('action') || '').toString();
+      if (!id) return new Response(JSON.stringify({ error: 'missing id' }), { status: 400, headers: { ...cors(env), 'content-type': 'application/json' } });
+      if (action === 'remove') await env.DB.prepare(`DELETE FROM subscribers WHERE id=?`).bind(id).run();
+      else if (action === 'bounce') await env.DB.prepare(`UPDATE subscribers SET bounced=1 WHERE id=?`).bind(id).run();
+      else if (action === 'restore') await env.DB.prepare(`UPDATE subscribers SET unsubscribed=0, bounced=0 WHERE id=?`).bind(id).run();
+      else return new Response(JSON.stringify({ error: 'bad action' }), { status: 400, headers: { ...cors(env), 'content-type': 'application/json' } });
+      return Response.json({ ok: true }, { headers: cors(env) });
     }
 
     if (path === '/admin/preview' && request.method === 'GET') {

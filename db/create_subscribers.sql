@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS subscribers (
   email        TEXT UNIQUE NOT NULL,
   created_at   TEXT,
   token        TEXT,           -- unsubscribe token
-  unsubscribed INTEGER DEFAULT 0
+  unsubscribed INTEGER DEFAULT 0,
+  bounced      INTEGER DEFAULT 0
 );
