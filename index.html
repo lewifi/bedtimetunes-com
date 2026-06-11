@@ -52,6 +52,8 @@
     #notice a{color:#fff;text-decoration:underline}
     .estimate{font-size:.5rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.35);padding:.1rem .9rem .4rem}
     .ver{opacity:.4;font-size:.9em}
+    .switch-btn{display:inline-block;margin-top:.5rem;margin-left:.4rem;background:rgba(255,255,255,.05);border:1px solid rgba(194,65,107,.5);color:rgba(255,255,255,.8);border-radius:100px;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.16em;text-transform:uppercase;padding:.25rem .7rem;cursor:pointer;transition:all .2s}
+    .switch-btn:hover{background:rgba(194,65,107,.25);color:#fff;border-color:rgba(194,65,107,.8)}
 
     .progress{width:100%;max-width:480px;display:flex;flex-direction:column;gap:.35rem}
     #bar{width:100%;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:rgba(255,255,255,.12);cursor:pointer;outline:none}
@@ -134,6 +136,7 @@
         <div id="t-artist">—</div>
         <div id="t-genre"></div>
         <span class="src-badge" id="src-badge"></span>
+        <button id="switch" class="switch-btn hidden"></button>
         <div id="notice"></div>
       </div>
       <div class="progress" id="mp3-progress">
@@ -177,7 +180,7 @@
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
 // ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
-const VERSION='v3.0.3', BUILD_DATE='2026-06-11';
+const VERSION='v3.0.4', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
 const SPOTIFY_PLAYLIST_URL='https://open.spotify.com/playlist/6AGKG8W0y4xezu8Cl6Rtkj';
 document.getElementById('sp-playlist').href=SPOTIFY_PLAYLIST_URL;
@@ -210,7 +213,7 @@ let tracks=[], order=[], pos=0, shuffleOn=false, reverseOn=false, source=null;
 let ytPlayer=null, ytReady=false, spCtrl=null, spReady=false, spAdvanced=false;
 const fmt=s=>{s=Math.floor(s||0);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const sourceOf=t=> t.youtube_id?'youtube' : t.mp3_key?'mp3' : t.spotify_id?'spotify' : null;
+const sourceOf=t=> t.mp3_key?'mp3' : t.youtube_id?'youtube' : t.spotify_id?'spotify' : null;
 const srcIcon=s=> s==='mp3'?'♪' : s==='youtube'?'▶' : s==='spotify'?'⠿' : '·';
 
 async function init(){
@@ -271,10 +274,10 @@ function showSource(s){
   setIcon(false);
 }
 
-function cue(p, autoplay){
+function cue(p, autoplay, forceSrc){
   pos=((p%order.length)+order.length)%order.length;
   const t=tracks[order[pos]];
-  const s=sourceOf(t);
+  const s=forceSrc || sourceOf(t);   // default = mp3-first; forceSrc = manual switch
   spAdvanced=false; $('notice').textContent='';
   $('t-title').textContent=t.title;
   $('t-artist').textContent=t.artist;
@@ -282,6 +285,13 @@ function cue(p, autoplay){
   showSource(s);
   highlight();
   history.replaceState(null,'',location.pathname+'#'+t.id); // neat shareable URL
+
+  // offer a switch when the track has BOTH a self-hosted mp3 and a youtube video
+  const sw=$('switch');
+  if(t.mp3_key && t.youtube_id){
+    sw.classList.remove('hidden');
+    sw.textContent = s==='youtube' ? '♪ back to mp3' : '▶ switch to youtube';
+  } else sw.classList.add('hidden');
 
   // resolved cover art (art_url = external e.g. spotify/youtube; art_key = our B2 image); logo shows behind if none
   const art=$('art'), img=t.art_url || (t.art_key?`${AUDIO_BASE}/${t.art_key}`:'');
@@ -318,6 +328,7 @@ $('play').addEventListener('click',()=>{
 });
 $('next').addEventListener('click',next);
 $('prev').addEventListener('click',prev);
+$('switch').addEventListener('click',()=>{ cue(pos, true, source==='youtube' ? 'mp3' : 'youtube'); });
 $('share').addEventListener('click',async()=>{
   const t=tracks[order[pos]];
   const url=`${location.origin}/#${t.id}`;
