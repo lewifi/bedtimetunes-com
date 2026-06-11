@@ -258,7 +258,9 @@ function mailShell(inner, unsub) {
   return `<!doctype html><html><body style="margin:0;padding:0;background:#0d0510">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0510"><tr><td align="center" style="padding:28px 16px">
 <table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#160a1a;border:1px solid #2a1830;border-radius:16px">
-<tr><td style="padding:26px 28px 0;font-family:Arial,sans-serif;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:#c2416b;font-weight:bold">Bedtime Tunes</td></tr>
+<tr><td style="padding:24px 28px 0;font-family:Arial,sans-serif">
+<img src="https://bedtimetunes.com/bedtimetunes.jpg" width="40" height="40" alt="Bedtime Tunes" style="vertical-align:middle;border-radius:10px;margin-right:10px">
+<span style="font-size:13px;letter-spacing:3px;text-transform:uppercase;color:#c2416b;font-weight:bold;vertical-align:middle">Bedtime Tunes</span></td></tr>
 <tr><td style="padding:16px 28px 26px;font-family:Arial,sans-serif;color:#e8dce8;font-size:15px;line-height:1.6">${inner}</td></tr>
 <tr><td style="padding:0 28px 24px;font-family:Arial,sans-serif;color:#6b5b6b;font-size:11px;line-height:1.5">You're receiving this because you subscribed to Bedtime Tunes updates.<br><a href="${unsub}" style="color:#9a6b85">Unsubscribe</a></td></tr>
 </table></td></tr></table></body></html>`;
