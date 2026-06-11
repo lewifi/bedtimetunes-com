@@ -33,6 +33,21 @@ async function svgToPng(svg) {
   if (_fontBuf) opts.font = { fontBuffers: [_fontBuf], loadSystemFonts: false, defaultFontFamily: 'Barlow' };
   return new Resvg(svg, opts).render().asPng();
 }
+
+// crawlers/link-unfurlers that shouldn't count as visitors
+function isBot(ua) {
+  return /bot|crawl|spider|preview|facebookexternalhit|slackbot|discord|telegram|whatsapp|embedly|bingbot|twitterbot|linkedin|pinterest|redditbot|headless|monitor|uptime|curl|wget|python-requests|axios|node-fetch|go-http|googleimageproxy|feedfetcher|apple-?mail|mediapartners/i.test(ua || '');
+}
+// anonymous, stable visitor id — one-way hash of ip+ua+salt; the raw IP is never stored
+async function visitorId(request, env) {
+  try {
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    const ua = request.headers.get('User-Agent') || '';
+    const data = new TextEncoder().encode(`${ip}|${ua}|${env.ANALYTICS_SALT || 'bt-anon-salt'}`);
+    const buf = await crypto.subtle.digest('SHA-256', data);
+    return [...new Uint8Array(buf)].slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch (e) { return null; }
+}
 const cors = (env) => ({
   'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
@@ -192,7 +207,7 @@ input,textarea{width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(255,2
 input[type=file]{padding:.45rem;font-size:.75rem}
 button.go{background:linear-gradient(135deg,#c2416b,#7b2650);border:none;color:#fff;border-radius:100px;padding:.7rem;font-family:'Barlow';letter-spacing:.2em;text-transform:uppercase;font-size:.65rem;cursor:pointer;margin-top:.4rem}
 #msg{font-size:.8rem;min-height:1.2rem;text-align:center}</style></head>
-<body><div class="card"><h1>Add a tune</h1>
+<body><div class="card"><a class="back top" href="/admin">← back to admin</a><h1>Add a tune</h1>
 <p class="hint">Provide an MP3, a link, or both — plus a cover image if you have one.</p>
 <div><label>Spotify or YouTube link (optional)</label><input id="url" placeholder="https://open.spotify.com/track/… or youtu.be/…"></div>
 <div><label>MP3 file (optional)</label><input id="mp3" type="file" accept="audio/mpeg,.mp3"></div>
@@ -233,13 +248,16 @@ input[type=file]{padding:.45rem;font-size:.75rem}
 button.go{background:linear-gradient(135deg,#c2416b,#7b2650);border:none;color:#fff;border-radius:100px;padding:.7rem;font-family:'Barlow';letter-spacing:.2em;text-transform:uppercase;font-size:.65rem;cursor:pointer;margin-top:.4rem}
 a.go{display:block;text-align:center;text-decoration:none;background:rgba(255,255,255,.05);border:1px solid rgba(194,65,107,.5);color:rgba(255,255,255,.85);border-radius:100px;padding:.7rem;font-family:'Barlow';letter-spacing:.2em;text-transform:uppercase;font-size:.65rem;transition:all .2s}
 a.go:hover{background:rgba(194,65,107,.25);border-color:rgba(194,65,107,.85);color:#fff}
+.back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem}
+.back:hover{color:#fff}
+.back.top{align-self:flex-start;margin-bottom:.5rem}
 #msg{font-size:.8rem;min-height:1.2rem;text-align:center}`;
 
 const NEW_USER_PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Add a curator · Bedtime Tunes</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
 <style>${FORM_CSS}</style></head>
-<body><div class="card"><h1>Add a curator</h1>
+<body><div class="card"><a class="back top" href="/admin">← back to admin</a><h1>Add a curator</h1>
 <p class="hint">Links a Cloudflare Access login to the curator name shown on their tracks. They must also be added to the Access policy in Zero Trust to reach /add.</p>
 <div><label>Name (shown on tracks)</label><input id="name"></div>
 <div><label>Cloudflare Access email</label><input id="email" type="email" placeholder="they@example.com"></div>
@@ -335,7 +353,7 @@ a.go{display:block;text-decoration:none;text-align:center}
 textarea{width:100%;min-height:120px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:.6rem .7rem;color:#fff;font-family:'Josefin Sans',sans-serif;font-size:.9rem;outline:none}
 hr{border:none;border-top:1px solid rgba(255,255,255,.1);margin:.3rem 0}
 .back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem;text-align:center}</style></head>
-<body><div class="card"><h1>Admin</h1>
+<body><div class="card"><a class="back top" href="https://bedtimetunes.com">← back to the player</a><h1>Admin</h1>
 <a class="go" href="/add">♪ Add a tune</a>
 <div class="row"><a class="go" href="/admin/new-user">＋ Curator</a><a class="go" href="/admin/users">👥 Subscribers (${count})</a></div>
 <a class="go" href="/admin/stats">📊 View stats</a>
@@ -381,38 +399,72 @@ $('import').addEventListener('click',async function(){
 }
 
 function statsPage(d) {
-  const card = (label, val) => `<div class="stat"><div class="num">${val}</div><div class="lbl">${label}</div></div>`;
-  const counts = Object.fromEntries((d.byType || []).map(r => [r.type, r.n]));
-  const playRows = (d.topPlays || []).map(r => `<tr><td>${r.title ? xml(r.title) : '#' + (r.track_id ?? '—')}</td><td>${r.artist ? xml(r.artist) : ''}</td><td style="text-align:right">${r.n}</td></tr>`).join('') || '<tr><td colspan="3" style="color:rgba(255,255,255,.4)">No plays yet.</td></tr>';
-  const recentRows = (d.recent || []).map(r => `<tr><td>${(r.ts || '').slice(0, 16).replace('T', ' ')}</td><td>${r.type}</td><td>${r.track_id ?? ''}</td><td>${r.meta ? xml(r.meta) : ''}</td></tr>`).join('') || '<tr><td colspan="4" style="color:rgba(255,255,255,.4)">Nothing yet.</td></tr>';
+  const card = (v, l, sub) => `<div class="stat"><div class="num">${v}</div><div class="lbl">${l}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+  const ppv = d.vis7 ? (d.plays7 / d.vis7).toFixed(1) : '0';
+  const trackRows = (arr) => arr.length ? arr.map(r => `<tr><td>${r.title ? xml(r.title) : '#' + (r.track_id ?? '—')}</td><td class="dim">${r.artist ? xml(r.artist) : ''}</td><td class="r">${r.n}</td></tr>`).join('') : '<tr><td colspan="3" class="dim">No data yet.</td></tr>';
+  const maxD = Math.max(1, ...d.daily.map(x => x.plays));
+  const bars = d.daily.length ? d.daily.map(x => `<div class="bar"><div class="fill" style="height:${Math.max(2, Math.round(x.plays / maxD * 100))}%" title="${x.d}: ${x.plays} plays, ${x.vis} visitors"></div><div class="bx">${x.d.slice(8)}</div></div>`).join('') : '<div class="dim" style="padding:1rem">No data in the last 14 days.</div>';
+  const rowsKV = (arr, k) => arr.length ? arr.map(r => `<tr><td>${xml(String(r[k] || '—'))}</td><td class="r">${r.n}</td></tr>`).join('') : '<tr><td colspan="2" class="dim">—</td></tr>';
+  const recent = d.recent.map(r => `<tr><td class="dim">${(r.ts || '').slice(0, 16).replace('T', ' ')}</td><td>${r.type}</td><td>${r.track_id ?? ''}</td><td class="dim">${r.meta ? xml(r.meta) : ''}</td></tr>`).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Stats · Bedtime Tunes</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
 <style>${FORM_CSS}
-.card{max-width:820px}
+.card{max-width:860px}
 .stats{display:flex;flex-wrap:wrap;gap:.6rem;width:100%}
-.stat{flex:1;min-width:90px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:.8rem;text-align:center}
-.stat .num{font-family:'Barlow';font-weight:700;font-size:1.5rem;color:#fff}
+.stat{flex:1;min-width:120px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:.8rem}
+.stat .num{font-family:'Barlow';font-weight:700;font-size:1.6rem;color:#fff}
 .stat .lbl{font-family:'Barlow';font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-top:.2rem}
-h2{font-family:'Barlow';font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.5);margin:1.2rem 0 .4rem;width:100%}
+.stat .sub{font-size:.7rem;color:rgba(255,255,255,.35);margin-top:.15rem}
+h2{font-family:'Barlow';font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.5);margin:1.4rem 0 .5rem;width:100%}
 table{width:100%;border-collapse:collapse;font-size:.82rem}
 th,td{text-align:left;padding:.4rem .55rem;border-bottom:1px solid rgba(255,255,255,.08)}
-th{font-family:'Barlow';font-size:.5rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.4)}
-.back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem}</style></head>
-<body><div class="card"><h1>Stats</h1>
+td.r,th.r{text-align:right}
+.dim{color:rgba(255,255,255,.4)}
+.chart{display:flex;align-items:flex-end;gap:4px;height:130px;width:100%;padding-top:.5rem}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.fill{width:100%;max-width:26px;background:linear-gradient(180deg,#c2416b,#7b2650);border-radius:4px 4px 0 0;min-height:2px}
+.bx{font-size:.5rem;color:rgba(255,255,255,.35);margin-top:.25rem}
+.cols{display:flex;gap:1.2rem;flex-wrap:wrap}.cols>div{flex:1;min-width:240px}
+.note{font-size:.7rem;color:rgba(255,255,255,.4);margin-top:.3rem}
+.back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem;display:inline-block;margin-top:1.2rem}</style></head>
+<body><div class="card"><a class="back top" href="/admin">← back to admin</a><h1>Stats</h1>
+<p class="hint">Anonymous — counts unique visitors by a hashed id, no IPs stored. Bots &amp; link-preview bots are excluded.</p>
+<h2>Last 7 days</h2>
 <div class="stats">
-${card('plays', counts.play || 0)}
-${card('shares', counts.share || 0)}
-${card('yt switches', counts.switch || 0)}
-${card('subscribes', counts.subscribe || 0)}
-${card('email clicks', counts.email_click || 0)}
-${card('email opens', counts.email_open || 0)}
+${card(d.vis7, 'visitors', `${d.visToday} today`)}
+${card(d.pv7, 'page views', `${d.pvToday} today`)}
+${card(d.plays7, 'plays', `${d.playsToday} today`)}
+${card(ppv, 'plays / visitor')}
+${card(d.shares7, 'shares')}
+${card(d.subs7, 'new subscribers')}
 </div>
-<h2>Most played</h2>
-<table><thead><tr><th>Title</th><th>Artist</th><th style="text-align:right">Plays</th></tr></thead><tbody>${playRows}</tbody></table>
-<h2>Recent activity</h2>
-<table><thead><tr><th>When (UTC)</th><th>Event</th><th>Track</th><th>Meta</th></tr></thead><tbody>${recentRows}</tbody></table>
-<a class="back" href="/admin" style="display:inline-block;margin-top:1rem">← back to admin</a></div></body></html>`;
+<h2>Plays per day · last 14 days</h2>
+<div class="chart">${bars}</div>
+<h2>Most played · all time</h2>
+<table><thead><tr><th>Title</th><th>Artist</th><th class="r">Plays</th></tr></thead><tbody>${trackRows(d.topPlays)}</tbody></table>
+<div class="cols">
+<div><h2>Most shared</h2><table><tbody>${d.topShares.length ? d.topShares.map(r => `<tr><td>${r.title ? xml(r.title) : '#' + (r.track_id ?? '—')}</td><td class="r">${r.n}</td></tr>`).join('') : '<tr><td class="dim">—</td></tr>'}</tbody></table></div>
+<div><h2>Listening source</h2><table><tbody>${rowsKV(d.sources, 'meta')}</tbody></table></div>
+<div><h2>Top countries</h2><table><tbody>${rowsKV(d.countries, 'country')}</tbody></table></div>
+</div>
+<h2>Email</h2>
+<div class="stats">
+${card(d.emailClicks, 'clicks')}
+${card(d.emailOpens, 'opens')}
+</div>
+<p class="note">Opens are approximate — Apple/Gmail pre-load images, so treat clicks as the reliable signal. Click tracking covers the new-tune emails.</p>
+<h2>Subscribers</h2>
+<div class="stats">
+${card(d.subActive, 'active')}
+${card(d.subUnsub, 'unsubscribed')}
+${card(d.subBounce, 'bounced')}
+${card(d.visAll, 'visitors all-time')}
+${card(d.playsAll, 'plays all-time')}
+</div>
+<details style="margin-top:1.2rem"><summary class="dim" style="cursor:pointer;font-size:.8rem">Recent activity</summary>
+<table style="margin-top:.5rem"><thead><tr><th>When (UTC)</th><th>Event</th><th>Track</th><th>Meta</th></tr></thead><tbody>${recent || '<tr><td colspan="4" class="dim">Nothing yet.</td></tr>'}</tbody></table></details>
+<a class="back" href="/admin">← back to admin</a></div></body></html>`;
 }
 
 function usersPage(rows) {
@@ -432,7 +484,7 @@ th{font-family:'Barlow';font-size:.55rem;letter-spacing:.15em;text-transform:upp
 .act:hover{background:rgba(255,255,255,.12);color:#fff}
 .act.danger:hover{background:rgba(194,65,107,.3);border-color:rgba(194,65,107,.7)}
 .back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem}</style></head>
-<body><div class="card"><h1>Subscribers</h1>
+<body><div class="card"><a class="back top" href="/admin">← back to admin</a><h1>Subscribers</h1>
 <p class="hint">${active} active · ${rows.length} total</p>
 <table><thead><tr><th>#</th><th>Email</th><th>Joined</th><th>Status</th><th></th></tr></thead><tbody>${trs || '<tr><td colspan="5" style="color:rgba(255,255,255,.4)">No subscribers yet.</td></tr>'}</tbody></table>
 <a class="back" href="/admin">← back to admin</a></div>
@@ -500,17 +552,21 @@ export default {
       const cemail = (form.get('email') || '').toString().trim().toLowerCase();
       if (!name || !cemail) return new Response(JSON.stringify({ error: 'Need a name and an Access email' }), { status: 400, headers: { ...cors(env), 'content-type': 'application/json' } });
       const nid = (await env.DB.prepare(`SELECT COALESCE(MAX(id),5)+1 AS n FROM uploaders`).first()).n;
-      let photo = null;
+      let photo = null, note = null;
       const pf = form.get('photo');
       if (pf && pf.size) {
-        if (!env.B2_KEY_ID || !env.B2_APP_KEY) return new Response(JSON.stringify({ error: 'Uploads not configured (set B2_KEY_ID/B2_APP_KEY)' }), { status: 500, headers: { ...cors(env), 'content-type': 'application/json' } });
-        const ext = (pf.name.split('.').pop() || 'jpg').toLowerCase();
-        const r = await putB2(env, `u${nid}.${ext}`, await pf.arrayBuffer(), CT[ext] || 'image/jpeg');
-        if (r.ok) photo = `u${nid}.${ext}`;
+        if (!env.B2_KEY_ID || !env.B2_APP_KEY) {
+          note = 'Curator created, but the photo was skipped — uploads need B2_KEY_ID/B2_APP_KEY secrets on the Worker.';
+        } else {
+          const ext = (pf.name.split('.').pop() || 'jpg').toLowerCase();
+          const r = await putB2(env, `u${nid}.${ext}`, await pf.arrayBuffer(), CT[ext] || 'image/jpeg');
+          if (r.ok) photo = `u${nid}.${ext}`;
+          else note = 'Curator created, but the photo upload to B2 failed.';
+        }
       }
       await env.DB.prepare(`INSERT INTO uploaders (id, name, email, url, photo) VALUES (?,?,?,?,?)`)
         .bind(nid, name, cemail, (form.get('url') || '').toString() || null, photo).run();
-      return Response.json({ id: nid, name, email: cemail, photo }, { headers: cors(env) });
+      return Response.json({ id: nid, name, email: cemail, photo, note }, { headers: cors(env) });
     }
 
     if (path === '/admin' && request.method === 'GET') {
@@ -544,12 +600,44 @@ export default {
     if (path === '/admin/stats' && request.method === 'GET') {
       const bad = ownerOnly(request);
       if (bad) return new Response(bad, { status: 403 });
-      const [byType, topPlays, recent] = await Promise.all([
-        env.DB.prepare(`SELECT type, COUNT(*) n FROM events GROUP BY type`).all().catch(() => ({ results: [] })),
-        env.DB.prepare(`SELECT e.track_id, t.title, t.artist, COUNT(*) n FROM events e LEFT JOIN tunes t ON t.id=e.track_id WHERE e.type='play' GROUP BY e.track_id ORDER BY n DESC LIMIT 10`).all().catch(() => ({ results: [] })),
-        env.DB.prepare(`SELECT ts, type, track_id, meta FROM events ORDER BY id DESC LIMIT 30`).all().catch(() => ({ results: [] })),
+      const now = Date.now();
+      const d7 = new Date(now - 7 * 864e5).toISOString();
+      const d14 = new Date(now - 14 * 864e5).toISOString();
+      const t0 = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z').toISOString();
+      const one = (sql, ...b) => env.DB.prepare(sql).bind(...b).first().then(r => (r ? Object.values(r)[0] : 0)).catch(() => 0);
+      const all = (sql, ...b) => env.DB.prepare(sql).bind(...b).all().then(r => r.results || []).catch(() => []);
+      const [
+        visAll, vis7, visToday, pv7, pvToday, plays7, playsToday, playsAll, shares7,
+        emailClicks, emailOpens, subs7, subActive, subUnsub, subBounce,
+        topPlays, topShares, sources, countries, daily, recent,
+      ] = await Promise.all([
+        one(`SELECT COUNT(DISTINCT visitor) FROM events WHERE visitor IS NOT NULL`),
+        one(`SELECT COUNT(DISTINCT visitor) FROM events WHERE visitor IS NOT NULL AND ts>=?`, d7),
+        one(`SELECT COUNT(DISTINCT visitor) FROM events WHERE visitor IS NOT NULL AND ts>=?`, t0),
+        one(`SELECT COUNT(*) FROM events WHERE type='page' AND ts>=?`, d7),
+        one(`SELECT COUNT(*) FROM events WHERE type='page' AND ts>=?`, t0),
+        one(`SELECT COUNT(*) FROM events WHERE type='play' AND ts>=?`, d7),
+        one(`SELECT COUNT(*) FROM events WHERE type='play' AND ts>=?`, t0),
+        one(`SELECT COUNT(*) FROM events WHERE type='play'`),
+        one(`SELECT COUNT(*) FROM events WHERE type='share' AND ts>=?`, d7),
+        one(`SELECT COUNT(*) FROM events WHERE type='email_click'`),
+        one(`SELECT COUNT(*) FROM events WHERE type='email_open'`),
+        one(`SELECT COUNT(*) FROM events WHERE type='subscribe' AND ts>=?`, d7),
+        one(`SELECT COUNT(*) FROM subscribers WHERE COALESCE(unsubscribed,0)=0 AND COALESCE(bounced,0)=0`),
+        one(`SELECT COUNT(*) FROM subscribers WHERE unsubscribed=1`),
+        one(`SELECT COUNT(*) FROM subscribers WHERE bounced=1`),
+        all(`SELECT e.track_id, t.title, t.artist, COUNT(*) n FROM events e LEFT JOIN tunes t ON t.id=e.track_id WHERE e.type='play' GROUP BY e.track_id ORDER BY n DESC LIMIT 10`),
+        all(`SELECT e.track_id, t.title, t.artist, COUNT(*) n FROM events e LEFT JOIN tunes t ON t.id=e.track_id WHERE e.type='share' GROUP BY e.track_id ORDER BY n DESC LIMIT 5`),
+        all(`SELECT COALESCE(meta,'?') meta, COUNT(*) n FROM events WHERE type='play' GROUP BY meta ORDER BY n DESC`),
+        all(`SELECT COALESCE(country,'?') country, COUNT(*) n FROM events WHERE type='page' GROUP BY country ORDER BY n DESC LIMIT 8`),
+        all(`SELECT substr(ts,1,10) d, COUNT(*) plays, COUNT(DISTINCT visitor) vis FROM events WHERE type IN ('play','page') AND ts>=? GROUP BY d ORDER BY d`, d14),
+        all(`SELECT ts, type, track_id, meta FROM events ORDER BY id DESC LIMIT 15`),
       ]);
-      return new Response(statsPage({ byType: byType.results, topPlays: topPlays.results, recent: recent.results }), { headers: { 'content-type': 'text/html;charset=utf-8' } });
+      return new Response(statsPage({
+        visAll, vis7, visToday, pv7, pvToday, plays7, playsToday, playsAll, shares7,
+        emailClicks, emailOpens, subs7, subActive, subUnsub, subBounce,
+        topPlays, topShares, sources, countries, daily, recent,
+      }), { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
     if (path === '/admin/preview' && request.method === 'GET') {
@@ -689,6 +777,7 @@ export default {
 
     // ── analytics: event beacon (site), click redirect + open pixel (email) ──
     if (path === '/api/event' && request.method === 'POST') {
+      if (isBot(request.headers.get('User-Agent'))) return new Response(null, { status: 204, headers: cors(env) });
       let b = {};
       try { b = JSON.parse(await request.text()); } catch (e) {}
       const allowed = ['play', 'switch', 'share', 'page', 'subscribe', 'email_click', 'email_open'];
@@ -696,9 +785,10 @@ export default {
       if (!allowed.includes(type)) return new Response(null, { status: 204, headers: cors(env) });
       const tid = b.track_id ? parseInt(b.track_id, 10) : null;
       const meta = b.meta ? String(b.meta).slice(0, 200) : null;
+      const vis = await visitorId(request, env);
       try {
-        await env.DB.prepare(`INSERT INTO events (ts,type,track_id,meta,country) VALUES (?,?,?,?,?)`)
-          .bind(new Date().toISOString(), type, Number.isNaN(tid) ? null : tid, meta, (request.cf && request.cf.country) || null).run();
+        await env.DB.prepare(`INSERT INTO events (ts,type,track_id,meta,country,visitor) VALUES (?,?,?,?,?,?)`)
+          .bind(new Date().toISOString(), type, Number.isNaN(tid) ? null : tid, meta, (request.cf && request.cf.country) || null, vis).run();
       } catch (e) {}
       return new Response(null, { status: 204, headers: cors(env) });
     }
@@ -710,8 +800,8 @@ export default {
       let dest = 'https://bedtimetunes.com';
       try { const d = new URL(u); if (d.hostname === 'bedtimetunes.com' || d.hostname === 'audio.bedtimetunes.com') dest = d.toString(); } catch (_) {}
       try {
-        await env.DB.prepare(`INSERT INTO events (ts,type,track_id,meta,country) VALUES (?,?,?,?,?)`)
-          .bind(new Date().toISOString(), e, t ? parseInt(t, 10) : null, 'email', (request.cf && request.cf.country) || null).run();
+        await env.DB.prepare(`INSERT INTO events (ts,type,track_id,meta,country,visitor) VALUES (?,?,?,?,?,?)`)
+          .bind(new Date().toISOString(), e, t ? parseInt(t, 10) : null, 'email', (request.cf && request.cf.country) || null, await visitorId(request, env)).run();
       } catch (_) {}
       return Response.redirect(dest, 302);
     }
@@ -738,13 +828,16 @@ export default {
       await env.DB.prepare(`INSERT INTO subscribers (email, created_at, token, unsubscribed) VALUES (?,?,?,0)
                             ON CONFLICT(email) DO UPDATE SET unsubscribed=0`)
         .bind(email, new Date().toISOString(), newToken()).run();
-      try { await env.DB.prepare(`INSERT INTO events (ts,type,meta,country) VALUES (?,?,?,?)`).bind(new Date().toISOString(), 'subscribe', 'site', (request.cf && request.cf.country) || null).run(); } catch (e) {}
+      try { await env.DB.prepare(`INSERT INTO events (ts,type,meta,country,visitor) VALUES (?,?,?,?,?)`).bind(new Date().toISOString(), 'subscribe', 'site', (request.cf && request.cf.country) || null, await visitorId(request, env)).run(); } catch (e) {}
       return Response.json({ ok: true }, { headers: cors(env) });
     }
 
     if (path === '/unsubscribe' && request.method === 'GET') {
       const t = url.searchParams.get('t');
-      if (t) await env.DB.prepare(`UPDATE subscribers SET unsubscribed=1 WHERE token=?`).bind(t).run();
+      if (t) {
+        await env.DB.prepare(`UPDATE subscribers SET unsubscribed=1 WHERE token=?`).bind(t).run();
+        try { await env.DB.prepare(`INSERT INTO events (ts,type,meta) VALUES (?,?,?)`).bind(new Date().toISOString(), 'unsubscribe', 'email').run(); } catch (e) {}
+      }
       return new Response(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unsubscribed</title>
 <style>body{background:#160a1a;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:1rem}a{color:#e8739a}</style></head>
 <body><div><h2 style="font-weight:400">You've been unsubscribed.</h2><p style="color:rgba(255,255,255,.6)">You won't get any more emails from Bedtime Tunes.<br><a href="https://bedtimetunes.com">← back to the player</a></p></div></body></html>`,
