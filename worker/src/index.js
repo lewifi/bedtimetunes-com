@@ -114,8 +114,8 @@ export default {
       const key = decodeURIComponent(path.replace(/^\/+/, ''));
       const fwd = new Headers();
       const range = request.headers.get('Range'); if (range) fwd.set('Range', range);
-      const up = await fetch(`${env.B2_ENDPOINT}/${env.B2_BUCKET}/${key}`, { headers: fwd, cf: { cacheEverything: true, cacheTtl: 86400 } });
-      if (up.status === 404) return new Response('Not found', { status: 404, headers: cors(env) });
+      const b2host = env.B2_ENDPOINT.replace('https://', `https://${env.B2_BUCKET}.`);
+      const up = await fetch(`${b2host}/${key}`, { headers: fwd, cf: { cacheEverything: true, cacheTtl: 86400 } });      if (up.status === 404) return new Response('Not found', { status: 404, headers: cors(env) });
       const h = new Headers(up.headers);
       h.set('Content-Type', 'audio/mpeg'); h.set('Accept-Ranges', 'bytes');
       h.set('Cache-Control', 'public, max-age=86400, immutable');
