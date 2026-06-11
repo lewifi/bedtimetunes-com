@@ -1,0 +1,21 @@
+name = "bedtimetunes-audio"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bedtimetunes"
+database_id = "f3c824f9-88a9-401c-b148-281589c6cb65"
+
+[vars]
+ALLOWED_ORIGIN  = "https://bedtimetunes.com"
+ALLOWED_REFERER = "bedtimetunes.com"
+B2_ENDPOINT     = "https://s3.us-west-004.backblazeb2.com"
+B2_BUCKET       = "bedtimetunes-audio"
+DEFAULT_UPLOADER = "2"
+# email -> uploader id, for contributors who add via /add (Cloudflare Access identity)
+CONTRIBUTORS = "{\"lewi@ephix.net\":2,\"antisubliminal@gmail.com\":4}"
+
+# Secret (not here):  wrangler secret put SYNC_TOKEN
+# Custom domain audio.bedtimetunes.com added in dashboard.
+# Cloudflare Access must protect:  audio.bedtimetunes.com/add  AND  /api/add

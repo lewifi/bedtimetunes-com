@@ -1,0 +1,31 @@
+﻿# secrets
+.env
+.dev.vars
+*.local
+
+# audio + raw inputs (MP3s live in B2; the legacy dump has passwords)
+songs/
+*.mp3
+*.csv
+bedTimeTunes_*.sql
+*_dump.sql
+new_tracks.sql
+reconcile.csv
+playlist.csv
+
+# node / wrangler
+node_modules/
+.wrangler/
+dist/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
