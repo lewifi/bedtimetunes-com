@@ -20,7 +20,9 @@ ap.add_argument("--limit", type=int, default=100)
 args = ap.parse_args()
 
 def http(url, data=None, headers=None):
-    req = urllib.request.Request(url, data=data, headers=headers or {})
+    h = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+         **(headers or {})}
+    req = urllib.request.Request(url, data=data, headers=h)
     return json.loads(urllib.request.urlopen(req).read().decode())
 
 def yt_search(query):
