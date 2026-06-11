@@ -255,8 +255,16 @@
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
 // ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
-const VERSION='v3.0.14', BUILD_DATE='2026-06-11';
+const VERSION='v3.0.15', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
+function track(type,track_id,meta){
+  try{
+    const body=JSON.stringify({type,track_id:track_id||null,meta:meta||null});
+    const url=`${API_BASE}/api/event`;
+    if(navigator.sendBeacon){navigator.sendBeacon(url,new Blob([body],{type:'text/plain'}));}
+    else{fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},body,keepalive:true});}
+  }catch(e){}
+}
 const SPOTIFY_PLAYLIST_URL='https://open.spotify.com/playlist/6AGKG8W0y4xezu8Cl6Rtkj';
 document.getElementById('sp-playlist').href=SPOTIFY_PLAYLIST_URL;
 document.getElementById('ver').textContent=VERSION;
@@ -324,6 +332,7 @@ const srcIcon=s=> s==='mp3'?'♪' : s==='youtube'?'▶' : s==='spotify'?'⠿' : 
 async function init(){
   try{ tracks=await (await fetch(`${API_BASE}/api/tracks`)).json(); }catch(e){ $('t-title').textContent='Could not load playlist'; $('splash').classList.add('gone'); return; }
   order=tracks.map((_,i)=>i);
+  track('page');
   $('count').textContent=`${tracks.length} tunes`;
   // estimate total catalogue length from duration_ms
   const totalMs=tracks.reduce((s,t)=>s+(+t.duration_ms||0),0);
@@ -402,6 +411,7 @@ function cue(p, autoplay, forceSrc){
   showSource(s);
   highlight();
   history.replaceState(null,'',location.pathname+hashFor(t)); // neat shareable URL with name
+  if(autoplay) track('play', t.id, s);
 
   // offer a switch when the track has BOTH a self-hosted mp3 and a youtube video
   const sw=$('switch');
@@ -445,12 +455,13 @@ $('play').addEventListener('click',()=>{
 });
 $('next').addEventListener('click',next);
 $('prev').addEventListener('click',prev);
-$('switch').addEventListener('click',()=>{ cue(pos, true, source==='youtube' ? 'mp3' : 'youtube'); });
+$('switch').addEventListener('click',()=>{ track('switch', tracks[order[pos]].id, source==='youtube'?'to-mp3':'to-youtube'); cue(pos, true, source==='youtube' ? 'mp3' : 'youtube'); });
 $('desc-btn').addEventListener('click',e=>{ e.stopPropagation(); $('desc-wrap').classList.toggle('open'); });
 document.addEventListener('click',()=>$('desc-wrap').classList.remove('open'));
 $('share').addEventListener('click',async()=>{
   const t=tracks[order[pos]];
   const url=`${API_BASE}/s/${pathFor(t)}`;   // OG-enabled share link → redirects to the player
+  track('share', t.id);
   try{ await navigator.clipboard.writeText(url); $('notice').textContent='link copied ✓'; setTimeout(()=>{if($('notice').textContent==='link copied ✓')$('notice').textContent='';},2000); }
   catch(e){ prompt('Copy this link:', url); }
 });
