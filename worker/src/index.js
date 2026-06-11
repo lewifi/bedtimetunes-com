@@ -66,11 +66,29 @@ async function putB2(env, key, body, contentType) {
 const xml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const trunc = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
+// fetch an image and inline it as a data: URI so the card is self-contained
+// (standalone SVGs and many social rasterizers won't load external <image href>)
+async function dataUri(url) {
+  try {
+    const r = await fetch(url, { cf: { cacheEverything: true, cacheTtl: 86400 } });
+    if (!r.ok) return null;
+    const ct = r.headers.get('content-type') || 'image/jpeg';
+    const buf = new Uint8Array(await r.arrayBuffer());
+    let bin = ''; const C = 0x8000;
+    for (let i = 0; i < buf.length; i += C) bin += String.fromCharCode.apply(null, buf.subarray(i, i + C));
+    return `data:${ct};base64,${btoa(bin)}`;
+  } catch { return null; }
+}
+
 // 1200×630 social card: aurora orbs + logo tile + album art + title/artist
-function ogCard(t, art) {
+async function ogCard(t, artUrl) {
   const title = trunc(xml(t.title || ''), 22);
   const artist = trunc(xml((t.artist || '').toUpperCase()), 32);
-  const logo = 'https://bedtimetunes.com/bedtimetunes.jpg';
+  const [logo, art] = await Promise.all([
+    dataUri('https://bedtimetunes.com/bedtimetunes.jpg'),
+    dataUri(artUrl),
+  ]);
+  const artHref = art || logo;
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
 <defs>
   <filter id="b" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="75"/></filter>
@@ -88,9 +106,9 @@ function ogCard(t, art) {
   <circle cx="380" cy="560" r="170" fill="#b5476a"/>
 </g>
 <rect width="1200" height="630" fill="url(#fade)"/>
-<image xlink:href="${xml(logo)}" href="${xml(logo)}" x="70" y="235" width="160" height="160" clip-path="url(#lc)" preserveAspectRatio="xMidYMid slice"/>
+${logo ? `<image xlink:href="${logo}" x="70" y="235" width="160" height="160" clip-path="url(#lc)" preserveAspectRatio="xMidYMid slice"/>` : ''}
 <rect x="70" y="235" width="160" height="160" rx="24" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
-<image xlink:href="${xml(art)}" href="${xml(art)}" x="258" y="165" width="300" height="300" clip-path="url(#ac)" preserveAspectRatio="xMidYMid slice"/>
+${artHref ? `<image xlink:href="${artHref}" x="258" y="165" width="300" height="300" clip-path="url(#ac)" preserveAspectRatio="xMidYMid slice"/>` : ''}
 <rect x="258" y="165" width="300" height="300" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
 <text x="600" y="272" font-family="Barlow, Arial, sans-serif" font-size="60" font-weight="700" fill="#ffffff">${title}</text>
 <text x="600" y="336" font-family="Barlow, Arial, sans-serif" font-size="28" letter-spacing="6" fill="#ffffff" fill-opacity="0.7">${artist}</text>
@@ -100,8 +118,8 @@ function ogCard(t, art) {
 }
 
 // default site card (no specific track) — centered logo + wordmark
-function ogCardDefault() {
-  const logo = 'https://bedtimetunes.com/bedtimetunes.jpg';
+async function ogCardDefault() {
+  const logo = await dataUri('https://bedtimetunes.com/bedtimetunes.jpg');
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
 <defs>
   <filter id="b" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="80"/></filter>
@@ -117,7 +135,7 @@ function ogCardDefault() {
   <circle cx="640" cy="320" r="200" fill="#8b3a62"/>
 </g>
 <rect width="1200" height="630" fill="url(#fade)"/>
-<image xlink:href="${logo}" href="${logo}" x="500" y="120" width="200" height="200" clip-path="url(#lc)" preserveAspectRatio="xMidYMid slice"/>
+${logo ? `<image xlink:href="${logo}" x="500" y="120" width="200" height="200" clip-path="url(#lc)" preserveAspectRatio="xMidYMid slice"/>` : ''}
 <rect x="500" y="120" width="200" height="200" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
 <text x="600" y="420" text-anchor="middle" font-family="Barlow, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="6" fill="#ffffff">BEDTIME TUNES</text>
 <text x="600" y="468" text-anchor="middle" font-family="Barlow, Arial, sans-serif" font-size="24" letter-spacing="10" fill="#ffffff" fill-opacity="0.55">TUNES TO SNOOZE TO</text>
@@ -370,10 +388,10 @@ export default {
         if (t) {
           const art = t.art_url
             || (t.youtube_id ? `https://i.ytimg.com/vi/${t.youtube_id}/hqdefault.jpg` : 'https://bedtimetunes.com/bedtimetunes.jpg');
-          return new Response(ogCard(t, art), { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
+          return new Response(await ogCard(t, art), { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
         }
       }
-      return new Response(ogCardDefault(), { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
+      return new Response(await ogCardDefault(), { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
     }
 
     // B2 media proxy — audio AND images, hotlink-gated + edge-cached
