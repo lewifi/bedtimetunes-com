@@ -37,7 +37,7 @@
     .brand{font-family:'Barlow',sans-serif;font-weight:500;letter-spacing:.22em;text-transform:uppercase;font-size:1rem;opacity:.9}
     .brand small{display:block;font-size:.5rem;letter-spacing:.3em;opacity:.4;margin-top:.3rem}
 
-    .now{width:100%;max-width:480px;display:flex;flex-direction:column;align-items:center;gap:.7rem}
+    .now{width:100%;max-width:600px;display:flex;flex-direction:column;align-items:center;gap:.7rem}
     /* media area swaps between mp3 art / youtube / spotify */
     .media{width:100%;display:flex;justify-content:center}
     #art-wrap{width:min(280px,60vw);height:min(280px,60vw);border-radius:14px;overflow:hidden;background:url('/bedtimetunes.jpg') center/cover no-repeat,linear-gradient(135deg,#c2416b,#7b2650);box-shadow:0 0 80px rgba(192,65,107,.5),0 20px 60px rgba(0,0,0,.6);animation:float 8s ease-in-out infinite;transition:box-shadow .6s}
@@ -61,14 +61,16 @@
     .ver{opacity:.4;font-size:.9em}
     .switch-btn{display:inline-block;margin:0;background:rgba(255,255,255,.05);border:1px solid rgba(194,65,107,.5);color:rgba(255,255,255,.8);border-radius:100px;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.16em;text-transform:uppercase;padding:.3rem .8rem;cursor:pointer;transition:all .2s}
     .switch-btn:hover{background:rgba(194,65,107,.25);color:#fff;border-color:rgba(194,65,107,.8)}
-    .pill-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.45rem;margin-top:.5rem}
+    .pill-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.7rem;margin-top:.6rem;width:100%}
+    .story-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.7rem;margin-top:.4rem}
     .pill-cta{background:linear-gradient(135deg,rgba(194,65,107,.4),rgba(123,38,80,.4));border:1px solid rgba(194,65,107,.6);color:#fff;border-radius:100px;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.16em;text-transform:uppercase;padding:.3rem .85rem;cursor:pointer;transition:all .2s;animation:pillglow 3.5s ease-in-out infinite}
     .pill-cta:hover{background:linear-gradient(135deg,rgba(194,65,107,.65),rgba(123,38,80,.65));box-shadow:0 0 24px rgba(194,65,107,.6)}
     .pill-cta.alt{background:linear-gradient(135deg,rgba(224,144,44,.32),rgba(212,102,58,.32));border-color:rgba(224,144,44,.6);animation:none}
     .pill-cta.alt:hover{background:linear-gradient(135deg,rgba(224,144,44,.55),rgba(212,102,58,.55));box-shadow:0 0 24px rgba(224,144,44,.55)}
     @keyframes pillglow{0%,100%{box-shadow:0 0 0 rgba(194,65,107,0)}50%{box-shadow:0 0 16px rgba(194,65,107,.4)}}
-    .uploader{display:flex;align-items:center;justify-content:center;gap:.45rem;margin-top:.55rem;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.4);min-height:1rem}
-    .desc-wrap{position:relative;display:inline-block;margin-top:.6rem}
+    .uploader{display:flex;align-items:center;justify-content:center;gap:.45rem;margin-top:0;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+    .uploader:empty{display:none}
+    .desc-wrap{position:relative;display:inline-block;margin-top:0}
     .desc-btn{background:rgba(255,255,255,.05);border:1px solid rgba(194,65,107,.45);color:rgba(255,255,255,.75);border-radius:100px;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.18em;text-transform:uppercase;padding:.3rem .85rem;cursor:pointer;transition:all .2s}
     .desc-btn:hover{background:rgba(194,65,107,.25);color:#fff;border-color:rgba(194,65,107,.8)}
     .desc-pop{position:absolute;left:50%;top:calc(100% + .55rem);transform:translateX(-50%) translateY(-4px);width:min(300px,80vw);background:rgba(26,10,30,.97);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:.85rem 1rem;font-size:.8rem;line-height:1.5;color:rgba(255,255,255,.85);font-style:italic;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:60}
@@ -90,7 +92,7 @@
     .modal-apply{display:inline-block;text-align:center;margin-top:.4rem;background:linear-gradient(135deg,#c2416b,#7b2650);color:#fff;border-radius:100px;padding:.7rem;font-family:'Barlow',sans-serif;letter-spacing:.18em;text-transform:uppercase;font-size:.6rem;text-decoration:none}
     .modal-apply:hover{box-shadow:0 0 30px rgba(194,65,107,.6)}
 
-    .progress{width:100%;max-width:480px;display:flex;flex-direction:column;gap:.35rem}
+    .progress{width:100%;max-width:460px;display:flex;flex-direction:column;gap:.35rem;margin:0 auto}
     #bar{width:100%;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:rgba(255,255,255,.12);cursor:pointer;outline:none}
     #bar::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#c2416b;box-shadow:0 0 8px rgba(194,65,107,.8)}
     .times{display:flex;justify-content:space-between;font-size:.55rem;color:rgba(255,255,255,.35)}
@@ -175,11 +177,13 @@
         <div id="t-title">—</div>
         <div id="t-artist">—</div>
         <div id="t-genre"></div>
-        <span id="desc-wrap" class="desc-wrap hidden">
-          <button id="desc-btn" class="desc-btn" type="button">ℹ the story</button>
-          <span id="desc-pop" class="desc-pop"></span>
-        </span>
-        <div id="uploader" class="uploader"></div>
+        <div class="story-row">
+          <span id="desc-wrap" class="desc-wrap hidden">
+            <button id="desc-btn" class="desc-btn" type="button">ℹ the story</button>
+            <span id="desc-pop" class="desc-pop"></span>
+          </span>
+          <div id="uploader" class="uploader"></div>
+        </div>
         <span class="src-badge" id="src-badge"></span>
         <div class="pill-row">
           <button id="switch" class="switch-btn hidden"></button>
@@ -219,7 +223,8 @@
     </div>
     <div id="list"></div>
     <div class="foot">made by <a href="https://lewi.fi" target="_blank" rel="noopener">lewi.fi</a> &middot;
-      <a id="sp-playlist" href="#" target="_blank" rel="noopener">open in spotify ↗</a>
+      <a id="sp-playlist" href="#" target="_blank" rel="noopener">open in spotify ↗</a> &middot;
+      <a href="https://audio.bedtimetunes.com/admin" target="_blank" rel="noopener">admin</a>
       <span id="ver" class="ver"></span></div>
   </div>
 </div>
@@ -250,7 +255,7 @@
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
 // ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
-const VERSION='v3.0.13', BUILD_DATE='2026-06-11';
+const VERSION='v3.0.14', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
 const SPOTIFY_PLAYLIST_URL='https://open.spotify.com/playlist/6AGKG8W0y4xezu8Cl6Rtkj';
 document.getElementById('sp-playlist').href=SPOTIFY_PLAYLIST_URL;
