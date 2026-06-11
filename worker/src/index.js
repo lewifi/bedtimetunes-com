@@ -66,14 +66,16 @@ async function putB2(env, key, body, contentType) {
 const xml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const trunc = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
-// 1200×630 social card: aurora orbs + album art + title/artist
+// 1200×630 social card: aurora orbs + logo tile + album art + title/artist
 function ogCard(t, art) {
-  const title = trunc(xml(t.title || ''), 24);
-  const artist = trunc(xml((t.artist || '').toUpperCase()), 36);
+  const title = trunc(xml(t.title || ''), 22);
+  const artist = trunc(xml((t.artist || '').toUpperCase()), 32);
+  const logo = 'https://bedtimetunes.com/bedtimetunes.jpg';
   return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
 <defs>
   <filter id="b" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="75"/></filter>
-  <clipPath id="ac"><rect x="90" y="115" width="400" height="400" rx="30"/></clipPath>
+  <clipPath id="lc"><rect x="70" y="235" width="160" height="160" rx="24"/></clipPath>
+  <clipPath id="ac"><rect x="258" y="165" width="300" height="300" rx="28"/></clipPath>
   <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d0510" stop-opacity="0"/><stop offset="1" stop-color="#0d0510" stop-opacity="0.55"/></linearGradient>
 </defs>
 <rect width="1200" height="630" fill="#0d0510"/>
@@ -86,12 +88,14 @@ function ogCard(t, art) {
   <circle cx="380" cy="560" r="170" fill="#b5476a"/>
 </g>
 <rect width="1200" height="630" fill="url(#fade)"/>
-<image xlink:href="${xml(art)}" href="${xml(art)}" x="90" y="115" width="400" height="400" clip-path="url(#ac)" preserveAspectRatio="xMidYMid slice"/>
-<rect x="90" y="115" width="400" height="400" rx="30" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
-<text x="545" y="250" font-family="Barlow, Arial, sans-serif" font-size="68" font-weight="700" fill="#ffffff">${title}</text>
-<text x="545" y="322" font-family="Barlow, Arial, sans-serif" font-size="30" letter-spacing="6" fill="#ffffff" fill-opacity="0.7">${artist}</text>
-<text x="545" y="498" font-family="Barlow, Arial, sans-serif" font-size="26" letter-spacing="10" fill="#ffffff" fill-opacity="0.42">BEDTIME TUNES</text>
-<text x="545" y="532" font-family="Barlow, Arial, sans-serif" font-size="15" letter-spacing="6" fill="#ffffff" fill-opacity="0.3">TUNES TO SNOOZE TO</text>
+<image xlink:href="${xml(logo)}" href="${xml(logo)}" x="70" y="235" width="160" height="160" clip-path="url(#lc)" preserveAspectRatio="xMidYMid slice"/>
+<rect x="70" y="235" width="160" height="160" rx="24" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
+<image xlink:href="${xml(art)}" href="${xml(art)}" x="258" y="165" width="300" height="300" clip-path="url(#ac)" preserveAspectRatio="xMidYMid slice"/>
+<rect x="258" y="165" width="300" height="300" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
+<text x="600" y="272" font-family="Barlow, Arial, sans-serif" font-size="60" font-weight="700" fill="#ffffff">${title}</text>
+<text x="600" y="336" font-family="Barlow, Arial, sans-serif" font-size="28" letter-spacing="6" fill="#ffffff" fill-opacity="0.7">${artist}</text>
+<text x="600" y="468" font-family="Barlow, Arial, sans-serif" font-size="24" letter-spacing="10" fill="#ffffff" fill-opacity="0.42">BEDTIME TUNES</text>
+<text x="600" y="500" font-family="Barlow, Arial, sans-serif" font-size="14" letter-spacing="6" fill="#ffffff" fill-opacity="0.3">TUNES TO SNOOZE TO</text>
 </svg>`;
 }
 
@@ -136,6 +140,43 @@ $('go').addEventListener('click',async function(){
 });
 </script></body></html>`;
 
+const FORM_CSS = `*{box-sizing:border-box;margin:0;font-family:'Josefin Sans',sans-serif}body{background:#160a1a;color:#fff;display:flex;justify-content:center;padding:2rem;min-height:100vh}
+.card{width:100%;max-width:460px;background:rgba(26,10,30,.6);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:1.6rem;display:flex;flex-direction:column;gap:.85rem}
+h1{font-family:'Barlow';font-weight:500;letter-spacing:.2em;text-transform:uppercase;font-size:1rem}
+.hint{font-size:.8rem;color:rgba(255,255,255,.5)}
+label{font-family:'Barlow';font-size:.55rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:.25rem;display:block}
+input{width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:.6rem .7rem;color:#fff;font-size:.9rem;outline:none}
+input[type=file]{padding:.45rem;font-size:.75rem}
+button.go{background:linear-gradient(135deg,#c2416b,#7b2650);border:none;color:#fff;border-radius:100px;padding:.7rem;font-family:'Barlow';letter-spacing:.2em;text-transform:uppercase;font-size:.65rem;cursor:pointer;margin-top:.4rem}
+#msg{font-size:.8rem;min-height:1.2rem;text-align:center}`;
+
+const NEW_USER_PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Add a curator · Bedtime Tunes</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
+<style>${FORM_CSS}</style></head>
+<body><div class="card"><h1>Add a curator</h1>
+<p class="hint">Links a Cloudflare Access login to the curator name shown on their tracks. They must also be added to the Access policy in Zero Trust to reach /add.</p>
+<div><label>Name (shown on tracks)</label><input id="name"></div>
+<div><label>Cloudflare Access email</label><input id="email" type="email" placeholder="they@example.com"></div>
+<div><label>Link (optional — site/socials)</label><input id="url" placeholder="https://…"></div>
+<div><label>Photo (optional, small)</label><input id="photo" type="file" accept="image/*"></div>
+<button class="go" id="go">Add curator</button><div id="msg"></div></div>
+<script>
+var $=function(i){return document.getElementById(i)};
+$('go').addEventListener('click',async function(){
+  $('msg').textContent='Saving…';
+  var fd=new FormData();
+  ['name','email','url'].forEach(function(f){fd.append(f,$(f).value);});
+  if($('photo').files[0]) fd.append('photo',$('photo').files[0]);
+  try{
+    var r=await fetch('/api/new-user',{method:'POST',credentials:'include',body:fd});
+    var d=await r.json();
+    $('msg').textContent = r.ok ? ('Added curator '+d.name+' (id '+d.id+')') : (d.error||'Error '+r.status);
+    if(r.ok){ ['name','email','url'].forEach(function(f){$(f).value='';}); $('photo').value=''; }
+  }catch(e){ $('msg').textContent='Network error'; }
+});
+</script></body></html>`;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -145,11 +186,49 @@ export default {
     if (path === '/add' && request.method === 'GET')
       return new Response(ADD_PAGE, { headers: { 'content-type': 'text/html;charset=utf-8' } });
 
+    // curator admin (lock to owner: add /new-user + /api/new-user to the Access app, allow only your email;
+    // optionally set OWNER_EMAIL for a second check)
+    const ownerOnly = (request) => {
+      const e = request.headers.get('Cf-Access-Authenticated-User-Email');
+      if (!e) return 'Not behind Access';
+      if (env.OWNER_EMAIL && e.toLowerCase() !== env.OWNER_EMAIL.toLowerCase()) return 'Owner only';
+      return null;
+    };
+
+    if (path === '/new-user' && request.method === 'GET') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(bad, { status: 403 });
+      return new Response(NEW_USER_PAGE, { headers: { 'content-type': 'text/html;charset=utf-8' } });
+    }
+
+    if (path === '/api/new-user' && request.method === 'POST') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(JSON.stringify({ error: bad }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
+      const form = await request.formData();
+      const name = (form.get('name') || '').toString().trim();
+      const cemail = (form.get('email') || '').toString().trim().toLowerCase();
+      if (!name || !cemail) return new Response(JSON.stringify({ error: 'Need a name and an Access email' }), { status: 400, headers: { ...cors(env), 'content-type': 'application/json' } });
+      const nid = (await env.DB.prepare(`SELECT COALESCE(MAX(id),5)+1 AS n FROM uploaders`).first()).n;
+      let photo = null;
+      const pf = form.get('photo');
+      if (pf && pf.size) {
+        if (!env.B2_KEY_ID || !env.B2_APP_KEY) return new Response(JSON.stringify({ error: 'Uploads not configured (set B2_KEY_ID/B2_APP_KEY)' }), { status: 500, headers: { ...cors(env), 'content-type': 'application/json' } });
+        const ext = (pf.name.split('.').pop() || 'jpg').toLowerCase();
+        const r = await putB2(env, `u${nid}.${ext}`, await pf.arrayBuffer(), CT[ext] || 'image/jpeg');
+        if (r.ok) photo = `u${nid}.${ext}`;
+      }
+      await env.DB.prepare(`INSERT INTO uploaders (id, name, email, url, photo) VALUES (?,?,?,?,?)`)
+        .bind(nid, name, cemail, (form.get('url') || '').toString() || null, photo).run();
+      return Response.json({ id: nid, name, email: cemail, photo }, { headers: cors(env) });
+    }
+
     if (path === '/api/tracks' && request.method === 'GET') {
       const { results } = await env.DB.prepare(
-        `SELECT id, title, artist, genre, description, historical, uploader_id,
-                mp3_key, youtube_id, spotify_id, art_key, art_url, duration_ms
-           FROM tunes ORDER BY id ASC`
+        `SELECT t.id, t.title, t.artist, t.genre, t.description, t.historical, t.uploader_id,
+                t.mp3_key, t.youtube_id, t.spotify_id, t.art_key, t.art_url, t.duration_ms,
+                u.name AS uploader_name, u.url AS uploader_url, u.photo AS uploader_photo
+           FROM tunes t LEFT JOIN uploaders u ON u.id = t.uploader_id
+          ORDER BY t.id ASC`
       ).all();
       return Response.json(results, { headers: { ...cors(env), 'Cache-Control': 'public, max-age=60' } });
     }
@@ -177,8 +256,10 @@ export default {
     if (path === '/api/add' && request.method === 'POST') {
       const email = request.headers.get('Cf-Access-Authenticated-User-Email');
       if (!email) return new Response(JSON.stringify({ error: 'Not behind Access' }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
-      let map = {}; try { map = JSON.parse(env.CONTRIBUTORS || '{}'); } catch {}
-      const uploader = map[email] ?? parseInt(env.DEFAULT_UPLOADER || '2', 10);
+      let uploader;
+      const known = await env.DB.prepare(`SELECT id FROM uploaders WHERE email = ?`).bind(email.toLowerCase()).first();
+      if (known) uploader = known.id;                       // curator added via /new-user
+      else { let map = {}; try { map = JSON.parse(env.CONTRIBUTORS || '{}'); } catch {} uploader = map[email] ?? parseInt(env.DEFAULT_UPLOADER || '2', 10); }
       const nextId = (await env.DB.prepare(`SELECT COALESCE(MAX(id),146)+1 AS n FROM tunes`).first()).n;
 
       const ctype = request.headers.get('content-type') || '';
