@@ -99,6 +99,31 @@ function ogCard(t, art) {
 </svg>`;
 }
 
+// default site card (no specific track) — centered logo + wordmark
+function ogCardDefault() {
+  const logo = 'https://bedtimetunes.com/bedtimetunes.jpg';
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
+<defs>
+  <filter id="b" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="80"/></filter>
+  <clipPath id="lc"><rect x="500" y="120" width="200" height="200" rx="28"/></clipPath>
+  <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d0510" stop-opacity="0"/><stop offset="1" stop-color="#0d0510" stop-opacity="0.5"/></linearGradient>
+</defs>
+<rect width="1200" height="630" fill="#0d0510"/>
+<g filter="url(#b)" opacity="0.6">
+  <circle cx="200" cy="120" r="230" fill="#c2416b"/>
+  <circle cx="1040" cy="100" r="230" fill="#7b2650"/>
+  <circle cx="1080" cy="540" r="250" fill="#d4663a"/>
+  <circle cx="320" cy="560" r="220" fill="#e0902c"/>
+  <circle cx="640" cy="320" r="200" fill="#8b3a62"/>
+</g>
+<rect width="1200" height="630" fill="url(#fade)"/>
+<image xlink:href="${logo}" href="${logo}" x="500" y="120" width="200" height="200" clip-path="url(#lc)" preserveAspectRatio="xMidYMid slice"/>
+<rect x="500" y="120" width="200" height="200" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
+<text x="600" y="420" text-anchor="middle" font-family="Barlow, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="6" fill="#ffffff">BEDTIME TUNES</text>
+<text x="600" y="468" text-anchor="middle" font-family="Barlow, Arial, sans-serif" font-size="24" letter-spacing="10" fill="#ffffff" fill-opacity="0.55">TUNES TO SNOOZE TO</text>
+</svg>`;
+}
+
 const ADD_PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Add a tune · Bedtime Tunes</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
@@ -337,14 +362,18 @@ export default {
       return new Response(html, { headers: { 'content-type': 'text/html;charset=utf-8', 'Cache-Control': 'public, max-age=300', ...cors(env) } });
     }
 
-    if (path.startsWith('/og/')) {
+    if (path === '/og' || path.startsWith('/og/')) {
       const id = (path.match(/\/og\/(\d+)/) || [])[1];
-      const t = id && await env.DB.prepare(
-        `SELECT id, title, artist, art_url, youtube_id FROM tunes WHERE id=?`).bind(id).first();
-      if (!t) return new Response('Not found', { status: 404 });
-      const art = t.art_url
-        || (t.youtube_id ? `https://i.ytimg.com/vi/${t.youtube_id}/hqdefault.jpg` : 'https://bedtimetunes.com/bedtimetunes.jpg');
-      return new Response(ogCard(t, art), { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
+      if (id) {
+        const t = await env.DB.prepare(
+          `SELECT id, title, artist, art_url, youtube_id FROM tunes WHERE id=?`).bind(id).first();
+        if (t) {
+          const art = t.art_url
+            || (t.youtube_id ? `https://i.ytimg.com/vi/${t.youtube_id}/hqdefault.jpg` : 'https://bedtimetunes.com/bedtimetunes.jpg');
+          return new Response(ogCard(t, art), { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
+        }
+      }
+      return new Response(ogCardDefault(), { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
     }
 
     // B2 media proxy — audio AND images, hotlink-gated + edge-cached
