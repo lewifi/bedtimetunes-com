@@ -246,10 +246,12 @@ async function emailList(env, subject, render) {
   if (!env.EMAIL) return { sent: 0, total: 0, note: 'EMAIL binding not configured' };
   const { results } = await env.DB.prepare(`SELECT email, token FROM subscribers WHERE COALESCE(unsubscribed,0)=0 AND COALESCE(bounced,0)=0`).all();
   let sent = 0;
+  const addr = env.MAIL_FROM || 'tunes@bedtimetunes.com';
+  const from = addr.includes('<') ? addr : `Bedtime Tunes <${addr}>`;
   for (const s of results) {
     const unsub = `https://audio.bedtimetunes.com/unsubscribe?t=${s.token}`;
     const { html, text } = render(s, unsub);
-    try { await env.EMAIL.send({ from: env.MAIL_FROM || 'tunes@bedtimetunes.com', to: s.email, subject, html, text }); sent++; } catch (e) {}
+    try { await env.EMAIL.send({ from, to: s.email, subject, html, text }); sent++; } catch (e) {}
   }
   return { sent, total: results.length };
 }
@@ -268,8 +270,9 @@ function mailShell(inner, unsub) {
 
 function newSongEmail(track, unsub) {
   const play = `https://audio.bedtimetunes.com/s/${track.id}-${slugify(track.artist)}-${slugify(track.title)}`;
+  const cover = track.art ? `<div style="text-align:center;margin:0 0 18px"><a href="${play}"><img src="${track.art}" width="200" height="200" alt="" style="border-radius:14px;border:1px solid #2a1830;max-width:200px;height:auto"></a></div>` : '';
   const inner = `<p style="margin:0 0 8px;color:#9a8a9a;font-size:12px;letter-spacing:2px;text-transform:uppercase">A new tune was added</p>
-<h1 style="margin:0 0 4px;font-size:24px;color:#ffffff">${xml(track.title)}</h1>
+${cover}<h1 style="margin:0 0 4px;font-size:24px;color:#ffffff">${xml(track.title)}</h1>
 <p style="margin:0 0 22px;color:#b9a9b9;font-size:14px;letter-spacing:1px">${xml(track.artist)}</p>
 <a href="${play}" style="display:inline-block;background:#c2416b;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:100px;font-size:13px;letter-spacing:2px;text-transform:uppercase">&#9654; Listen now</a>`;
   return { html: mailShell(inner, unsub), text: `A new tune on Bedtime Tunes:\n${track.title} — ${track.artist}\n\nListen: ${play}\n\nUnsubscribe: ${unsub}` };
@@ -463,7 +466,7 @@ export default {
     if (path === '/admin/preview' && request.method === 'GET') {
       const bad = ownerOnly(request);
       if (bad) return new Response(bad, { status: 403 });
-      const sample = { id: 19, title: 'Black Hair', artist: 'Nick Cave & The Bad Seeds' };
+      const sample = { id: 19, title: 'Black Hair', artist: 'Nick Cave & The Bad Seeds', art: 'https://bedtimetunes.com/bedtimetunes.jpg' };
       const { html } = newSongEmail(sample, 'https://audio.bedtimetunes.com/unsubscribe?t=PREVIEW');
       return new Response(html, { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
@@ -586,8 +589,12 @@ export default {
              f.description || '', f.historical || '', uploader,
              mp3_key, src.youtube_id ?? null, src.spotify_id ?? null, art_key,
              new Date().toISOString()).run();
-      if (notify) ctx.waitUntil(emailList(env, `New tune: ${f.title || 'Untitled'} — ${f.artist || ''}`.trim(),
-        (s, unsub) => newSongEmail({ id: nextId, title: f.title || '(untitled)', artist: f.artist || '' }, unsub)));
+      if (notify) {
+        let mailArt = art_key ? `https://audio.bedtimetunes.com/${art_key}` : (f.art_url || null);
+        if (!mailArt && src.youtube_id) mailArt = `https://i.ytimg.com/vi/${src.youtube_id}/hqdefault.jpg`;
+        ctx.waitUntil(emailList(env, `New tune: ${f.title || 'Untitled'} — ${f.artist || ''}`.trim(),
+          (s, unsub) => newSongEmail({ id: nextId, title: f.title || '(untitled)', artist: f.artist || '', art: mailArt }, unsub)));
+      }
       return Response.json({ id: nextId, by: email, uploader, mp3_key, art_key, notified: notify, ...src }, { headers: cors(env) });
     }
 
