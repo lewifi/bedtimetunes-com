@@ -62,6 +62,8 @@
     .switch-btn{display:inline-block;margin-top:.5rem;margin-left:.4rem;background:rgba(255,255,255,.05);border:1px solid rgba(194,65,107,.5);color:rgba(255,255,255,.8);border-radius:100px;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.16em;text-transform:uppercase;padding:.25rem .7rem;cursor:pointer;transition:all .2s}
     .switch-btn:hover{background:rgba(194,65,107,.25);color:#fff;border-color:rgba(194,65,107,.8)}
     .uploader{display:flex;align-items:center;justify-content:center;gap:.45rem;margin-top:.55rem;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.4);min-height:1rem}
+    .desc{margin-top:.6rem;max-width:34ch;margin-left:auto;margin-right:auto;font-size:.78rem;line-height:1.45;color:rgba(255,255,255,.55);font-style:italic}
+    .desc:empty{display:none}
     .uploader a{color:rgba(255,255,255,.72);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.22)}
     .uploader a:hover{color:#fff}
     .up-photo{width:20px;height:20px;border-radius:50%;object-fit:cover;border:1px solid rgba(255,255,255,.2)}
@@ -163,6 +165,7 @@
         <div id="t-title">—</div>
         <div id="t-artist">—</div>
         <div id="t-genre"></div>
+        <div id="desc" class="desc"></div>
         <div id="uploader" class="uploader"></div>
         <span class="src-badge" id="src-badge"></span>
         <button id="switch" class="switch-btn hidden"></button>
@@ -220,7 +223,7 @@
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
 // ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
-const VERSION='v3.0.9', BUILD_DATE='2026-06-11';
+const VERSION='v3.0.10', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
 const SPOTIFY_PLAYLIST_URL='https://open.spotify.com/playlist/6AGKG8W0y4xezu8Cl6Rtkj';
 document.getElementById('sp-playlist').href=SPOTIFY_PLAYLIST_URL;
@@ -339,6 +342,7 @@ function cue(p, autoplay, forceSrc){
   $('t-artist').textContent=t.artist;
   document.title=`${t.title} — ${t.artist} · Bedtime Tunes`;
   $('t-genre').textContent=t.genre||'';
+  $('desc').textContent=t.description||'';
   const up=$('uploader');
   if(t.uploader_name){
     const ph=t.uploader_photo?`<img class="up-photo" src="${AUDIO_BASE}/${t.uploader_photo}" alt=""/>`:'';
