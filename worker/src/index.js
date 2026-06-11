@@ -256,27 +256,49 @@ a.go:hover{background:rgba(194,65,107,.25);border-color:rgba(194,65,107,.85);col
 const NEW_USER_PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Add a curator · Bedtime Tunes</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
-<style>${FORM_CSS}</style></head>
+<style>${FORM_CSS}
+.preview{display:none;margin:.3rem auto;width:120px;height:120px;border-radius:14px;object-fit:cover;border:1px solid rgba(255,255,255,.15)}
+.preview.show{display:block}</style></head>
 <body><div class="card"><a class="back top" href="/admin">← back to admin</a><h1>Add a curator</h1>
 <p class="hint">Links a Cloudflare Access login to the curator name shown on their tracks. They must also be added to the Access policy in Zero Trust to reach /add.</p>
 <div><label>Name (shown on tracks)</label><input id="name"></div>
 <div><label>Cloudflare Access email</label><input id="email" type="email" placeholder="they@example.com"></div>
 <div><label>Link (optional — site/socials)</label><input id="url" placeholder="https://…"></div>
-<div><label>Photo (optional, small)</label><input id="photo" type="file" accept="image/*"></div>
+<div><label>Photo (optional — auto-cropped to a 200×200 square)</label><input id="photo" type="file" accept="image/*"></div>
+<img id="preview" class="preview" alt="">
 <button class="go" id="go">Add curator</button><div id="msg"></div></div>
 <script>
 var $=function(i){return document.getElementById(i)};
+function cropSquare(file,size){return new Promise(function(res,rej){
+  var img=new Image();
+  img.onload=function(){
+    var s=Math.min(img.width,img.height),sx=(img.width-s)/2,sy=(img.height-s)/2;
+    var c=document.createElement('canvas');c.width=size;c.height=size;
+    var ctx=c.getContext('2d');ctx.imageSmoothingQuality='high';
+    ctx.drawImage(img,sx,sy,s,s,0,0,size,size);
+    c.toBlob(function(b){URL.revokeObjectURL(img.src);res(b);},'image/jpeg',0.9);
+  };
+  img.onerror=function(){URL.revokeObjectURL(img.src);rej(new Error('bad image'));};
+  img.src=URL.createObjectURL(file);
+});}
+$('photo').addEventListener('change',async function(){
+  var f=$('photo').files[0];if(!f){$('preview').classList.remove('show');return;}
+  try{var b=await cropSquare(f,200);$('preview').src=URL.createObjectURL(b);$('preview').classList.add('show');}catch(e){$('preview').classList.remove('show');}
+});
 $('go').addEventListener('click',async function(){
+  if(!$('name').value||!$('email').value){$('msg').textContent='Name and Access email required';return;}
   $('msg').textContent='Saving…';
   var fd=new FormData();
   ['name','email','url'].forEach(function(f){fd.append(f,$(f).value);});
-  if($('photo').files[0]) fd.append('photo',$('photo').files[0]);
+  var pf=$('photo').files[0];
+  if(pf){ try{var blob=await cropSquare(pf,200);fd.append('photo',blob,'photo.jpg');}catch(e){fd.append('photo',pf);} }
   try{
-    var r=await fetch('/admin/api/new-user',{method:'POST',credentials:'include',body:fd});
+    var r=await fetch('/admin/api/new-user',{method:'POST',credentials:'include',body:fd,redirect:'manual'});
+    if(r.type==='opaqueredirect'||r.status===0){$('msg').textContent='Session expired — reload to sign in again.';return;}
     var d=await r.json();
-    $('msg').textContent = r.ok ? ('Added curator '+d.name+' (id '+d.id+')') : (d.error||'Error '+r.status);
-    if(r.ok){ ['name','email','url'].forEach(function(f){$(f).value='';}); $('photo').value=''; }
-  }catch(e){ $('msg').textContent='Network error'; }
+    $('msg').textContent = r.ok ? ('Added curator '+d.name+' (id '+d.id+')'+(d.note?' — '+d.note:'')) : (d.error||'Error '+r.status);
+    if(r.ok){ ['name','email','url'].forEach(function(f){$(f).value='';}); $('photo').value=''; $('preview').classList.remove('show'); }
+  }catch(e){ $('msg').textContent='Request failed: '+(e&&e.message?e.message:e); }
 });
 </script></body></html>`;
 
@@ -355,8 +377,8 @@ hr{border:none;border-top:1px solid rgba(255,255,255,.1);margin:.3rem 0}
 .back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem;text-align:center}</style></head>
 <body><div class="card"><a class="back top" href="https://bedtimetunes.com">← back to the player</a><h1>Admin</h1>
 <a class="go" href="/add">♪ Add a tune</a>
-<div class="row"><a class="go" href="/admin/new-user">＋ Curator</a><a class="go" href="/admin/users">👥 Subscribers (${count})</a></div>
-<a class="go" href="/admin/stats">📊 View stats</a>
+<div class="row"><a class="go" href="/admin/new-user">＋ Add curator</a><a class="go" href="/admin/curators">👤 Curators</a></div>
+<div class="row"><a class="go" href="/admin/users">👥 Subscribers (${count})</a><a class="go" href="/admin/stats">📊 Stats</a></div>
 <hr>
 <p class="hint">Broadcast a custom email to all ${count} subscribers.</p>
 <div><label>Subject</label><input id="subject"></div>
@@ -467,6 +489,29 @@ ${card(d.playsAll, 'plays all-time')}
 <a class="back" href="/admin">← back to admin</a></div></body></html>`;
 }
 
+function curatorsPage(rows) {
+  const trs = rows.map(r => `<tr>
+<td>${r.photo ? `<img src="https://audio.bedtimetunes.com/${r.photo}" width="40" height="40" style="border-radius:8px;object-fit:cover;display:block">` : '<span class="dim">—</span>'}</td>
+<td>${xml(r.name)}</td>
+<td class="dim">${xml(r.email || '')}</td>
+<td>${r.url ? `<a href="${xml(r.url)}" target="_blank" rel="noopener" style="color:#e8739a">link ↗</a>` : ''}</td>
+<td class="r">${r.tracks}</td></tr>`).join('') || '<tr><td colspan="5" class="dim">No curators yet.</td></tr>';
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Curators · Bedtime Tunes</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
+<style>${FORM_CSS}
+.card{max-width:680px}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:middle}
+td.r,th.r{text-align:right}
+th{font-family:'Barlow';font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+.dim{color:rgba(255,255,255,.4)}</style></head>
+<body><div class="card"><a class="back top" href="/admin">← back to admin</a><h1>Curators</h1>
+<p class="hint">${rows.length} curator${rows.length === 1 ? '' : 's'}. Counts are tracks credited to each.</p>
+<table><thead><tr><th></th><th>Name</th><th>Access email</th><th>Link</th><th class="r">Tracks</th></tr></thead><tbody>${trs}</tbody></table>
+<a class="go" href="/admin/new-user" style="margin-top:1rem">＋ Add a curator</a></div></body></html>`;
+}
+
 function usersPage(rows) {
   const status = (r) => r.bounced ? '<span style="color:#caa15a">bounced</span>' : (r.unsubscribed ? '<span style="color:#9a6b6b">unsubscribed</span>' : '<span style="color:#7bbf7b">active</span>');
   const trs = rows.map(r => `<tr data-id="${r.id}"><td>${r.id}</td><td>${xml(r.email)}</td><td>${(r.created_at || '').slice(0, 10)}</td><td>${status(r)}</td>
@@ -574,6 +619,16 @@ export default {
       if (bad) return new Response(bad, { status: 403 });
       const c = await env.DB.prepare(`SELECT COUNT(*) n FROM subscribers WHERE COALESCE(unsubscribed,0)=0 AND COALESCE(bounced,0)=0`).first().catch(() => null);
       return new Response(adminPage(c ? c.n : 0), { headers: { 'content-type': 'text/html;charset=utf-8' } });
+    }
+
+    if (path === '/admin/curators' && request.method === 'GET') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(bad, { status: 403 });
+      const { results } = await env.DB.prepare(
+        `SELECT u.id, u.name, u.email, u.url, u.photo,
+                (SELECT COUNT(*) FROM tunes t WHERE t.uploader_id = u.id) AS tracks
+         FROM uploaders u ORDER BY u.id`).all();
+      return new Response(curatorsPage(results || []), { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
     if (path === '/admin/users' && request.method === 'GET') {
