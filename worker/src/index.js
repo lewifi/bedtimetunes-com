@@ -193,6 +193,8 @@ label{font-family:'Barlow';font-size:.55rem;letter-spacing:.2em;text-transform:u
 input{width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:.6rem .7rem;color:#fff;font-size:.9rem;outline:none}
 input[type=file]{padding:.45rem;font-size:.75rem}
 button.go{background:linear-gradient(135deg,#c2416b,#7b2650);border:none;color:#fff;border-radius:100px;padding:.7rem;font-family:'Barlow';letter-spacing:.2em;text-transform:uppercase;font-size:.65rem;cursor:pointer;margin-top:.4rem}
+a.go{display:block;text-align:center;text-decoration:none;background:rgba(255,255,255,.05);border:1px solid rgba(194,65,107,.5);color:rgba(255,255,255,.85);border-radius:100px;padding:.7rem;font-family:'Barlow';letter-spacing:.2em;text-transform:uppercase;font-size:.65rem;transition:all .2s}
+a.go:hover{background:rgba(194,65,107,.25);border-color:rgba(194,65,107,.85);color:#fff}
 #msg{font-size:.8rem;min-height:1.2rem;text-align:center}`;
 
 const NEW_USER_PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
