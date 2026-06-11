@@ -63,6 +63,38 @@ async function putB2(env, key, body, contentType) {
   });
 }
 
+const xml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const trunc = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+
+// 1200×630 social card: aurora orbs + album art + title/artist
+function ogCard(t, art) {
+  const title = trunc(xml(t.title || ''), 24);
+  const artist = trunc(xml((t.artist || '').toUpperCase()), 36);
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1200" height="630" viewBox="0 0 1200 630">
+<defs>
+  <filter id="b" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="75"/></filter>
+  <clipPath id="ac"><rect x="90" y="115" width="400" height="400" rx="30"/></clipPath>
+  <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d0510" stop-opacity="0"/><stop offset="1" stop-color="#0d0510" stop-opacity="0.55"/></linearGradient>
+</defs>
+<rect width="1200" height="630" fill="#0d0510"/>
+<g filter="url(#b)" opacity="0.6">
+  <circle cx="170" cy="110" r="210" fill="#c2416b"/>
+  <circle cx="1060" cy="80" r="220" fill="#7b2650"/>
+  <circle cx="1130" cy="520" r="250" fill="#d4663a"/>
+  <circle cx="640" cy="650" r="230" fill="#e0902c"/>
+  <circle cx="980" cy="330" r="190" fill="#8b3a62"/>
+  <circle cx="380" cy="560" r="170" fill="#b5476a"/>
+</g>
+<rect width="1200" height="630" fill="url(#fade)"/>
+<image xlink:href="${xml(art)}" href="${xml(art)}" x="90" y="115" width="400" height="400" clip-path="url(#ac)" preserveAspectRatio="xMidYMid slice"/>
+<rect x="90" y="115" width="400" height="400" rx="30" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
+<text x="545" y="250" font-family="Barlow, Arial, sans-serif" font-size="68" font-weight="700" fill="#ffffff">${title}</text>
+<text x="545" y="322" font-family="Barlow, Arial, sans-serif" font-size="30" letter-spacing="6" fill="#ffffff" fill-opacity="0.7">${artist}</text>
+<text x="545" y="498" font-family="Barlow, Arial, sans-serif" font-size="26" letter-spacing="10" fill="#ffffff" fill-opacity="0.42">BEDTIME TUNES</text>
+<text x="545" y="532" font-family="Barlow, Arial, sans-serif" font-size="15" letter-spacing="6" fill="#ffffff" fill-opacity="0.3">TUNES TO SNOOZE TO</text>
+</svg>`;
+}
+
 const ADD_PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Add a tune · Bedtime Tunes</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
@@ -191,6 +223,47 @@ export default {
              mp3_key, src.youtube_id ?? null, src.spotify_id ?? null, art_key,
              new Date().toISOString()).run();
       return Response.json({ id: nextId, by: email, uploader, mp3_key, art_key, ...src }, { headers: cors(env) });
+    }
+
+    // share page — per-track Open Graph card, then bounce to the player
+    if (path.startsWith('/s/')) {
+      const id = (path.match(/\/s\/(\d+)/) || [])[1];
+      const t = id && await env.DB.prepare(
+        `SELECT id, title, artist, description FROM tunes WHERE id=?`).bind(id).first();
+      if (!t) return Response.redirect('https://bedtimetunes.com/', 302);
+      const player = `https://bedtimetunes.com/#${path.replace('/s/', '')}`;
+      const title = xml(`${t.title} — ${t.artist}`);
+      const desc = xml(t.description || 'A bedtime tune to snooze to.');
+      const ogimg = `https://audio.bedtimetunes.com/og/${t.id}`;
+      const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>${title} · Bedtime Tunes</title>
+<meta property="og:type" content="music.song">
+<meta property="og:site_name" content="Bedtime Tunes">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}">
+<meta property="og:image" content="${ogimg}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="${player}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${ogimg}">
+<meta http-equiv="refresh" content="0;url=${player}">
+<script>location.replace(${JSON.stringify(player)})</script>
+</head><body style="background:#0d0510;color:#fff;font-family:sans-serif;text-align:center;padding:3rem">
+<p>Opening Bedtime Tunes…</p><a style="color:#e8739a" href="${player}">${title}</a></body></html>`;
+      return new Response(html, { headers: { 'content-type': 'text/html;charset=utf-8', 'Cache-Control': 'public, max-age=300', ...cors(env) } });
+    }
+
+    if (path.startsWith('/og/')) {
+      const id = (path.match(/\/og\/(\d+)/) || [])[1];
+      const t = id && await env.DB.prepare(
+        `SELECT id, title, artist, art_url, youtube_id FROM tunes WHERE id=?`).bind(id).first();
+      if (!t) return new Response('Not found', { status: 404 });
+      const art = t.art_url
+        || (t.youtube_id ? `https://i.ytimg.com/vi/${t.youtube_id}/hqdefault.jpg` : 'https://bedtimetunes.com/bedtimetunes.jpg');
+      return new Response(ogCard(t, art), { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
     }
 
     // B2 media proxy — audio AND images, hotlink-gated + edge-cached

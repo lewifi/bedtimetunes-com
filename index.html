@@ -208,7 +208,7 @@
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
 // ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
-const VERSION='v3.0.6', BUILD_DATE='2026-06-11';
+const VERSION='v3.0.7', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
 const SPOTIFY_PLAYLIST_URL='https://open.spotify.com/playlist/6AGKG8W0y4xezu8Cl6Rtkj';
 document.getElementById('sp-playlist').href=SPOTIFY_PLAYLIST_URL;
@@ -254,7 +254,8 @@ const fmt=s=>{s=Math.floor(s||0);return `${Math.floor(s/60)}:${String(s%60).padS
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const sourceOf=t=> t.mp3_key?'mp3' : t.youtube_id?'youtube' : t.spotify_id?'spotify' : null;
 const slug=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
-const hashFor=t=>`#${slug(t.artist+'-'+t.title)}-${t.id}`;   // neat: #zee-avi-honey-bee-147
+const pathFor=t=>`${t.id}-${slug(t.title)}-${slug(t.artist)}`;   // 147-honey-bee-zee-avi
+const hashFor=t=>`#${pathFor(t)}`;
 const srcIcon=s=> s==='mp3'?'♪' : s==='youtube'?'▶' : s==='spotify'?'⠿' : '·';
 
 async function init(){
@@ -272,7 +273,7 @@ async function init(){
 // map a track id (from #hash) to a position in the current order
 function cueFromHash(autoplay){
   const h=location.hash;
-  const id=(h.match(/(\d+)$/)||h.match(/\d+/)||[])[0];   // id is the trailing number
+  const id=(h.match(/^#?(\d+)/)||[])[1];   // id is the leading number
   if(!id) return false;
   const p=order.findIndex(oi=>String(tracks[oi].id)===id);
   if(p<0) return false;
@@ -374,7 +375,7 @@ $('prev').addEventListener('click',prev);
 $('switch').addEventListener('click',()=>{ cue(pos, true, source==='youtube' ? 'mp3' : 'youtube'); });
 $('share').addEventListener('click',async()=>{
   const t=tracks[order[pos]];
-  const url=`${location.origin}/${hashFor(t)}`;
+  const url=`${API_BASE}/s/${pathFor(t)}`;   // OG-enabled share link → redirects to the player
   try{ await navigator.clipboard.writeText(url); $('notice').textContent='link copied ✓'; setTimeout(()=>{if($('notice').textContent==='link copied ✓')$('notice').textContent='';},2000); }
   catch(e){ prompt('Copy this link:', url); }
 });
