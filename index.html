@@ -69,12 +69,21 @@
     #sidebar{flex:1;min-width:280px;max-width:420px;display:flex;flex-direction:column;background:rgba(26,10,30,.55);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:18px;overflow:hidden}
     .side-head{padding:1rem 1rem .6rem;display:flex;flex-direction:column;gap:.6rem}
     .side-title{font-family:'Barlow',sans-serif;font-size:.6rem;letter-spacing:.25em;text-transform:uppercase;color:rgba(255,255,255,.4);display:flex;justify-content:space-between;align-items:center}
-    #shuffle{background:none;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);border-radius:100px;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.18em;text-transform:uppercase;padding:.25rem .6rem;cursor:pointer;transition:all .2s}
-    #shuffle.on{color:#c2416b;border-color:rgba(194,65,107,.5);background:rgba(194,65,107,.12)}
+    .toggles{display:flex;gap:.4rem}
+    .tgl{display:inline-flex;align-items:center;gap:.4em;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.4);border-radius:100px;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.18em;text-transform:uppercase;padding:.28rem .65rem;cursor:pointer;transition:all .2s}
+    .tgl::before{content:'';width:6px;height:6px;border-radius:50%;border:1px solid currentColor;background:transparent;flex-shrink:0;transition:all .2s}
+    .tgl:hover{color:rgba(255,255,255,.72);border-color:rgba(255,255,255,.26)}
+    .tgl.on{color:#fff;border-color:rgba(194,65,107,.7);background:rgba(194,65,107,.28);box-shadow:0 0 14px rgba(194,65,107,.35)}
+    .tgl.on::before{background:#e8739a;border-color:#e8739a;box-shadow:0 0 7px rgba(232,115,154,.9)}
     #search{width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:.5rem .7rem;color:#fff;font-family:'Josefin Sans';font-size:.85rem;outline:none}
     #search::placeholder{color:rgba(255,255,255,.3)}
-    #list{flex:1;overflow-y:auto;scrollbar-width:thin;padding:.3rem}
-    #list::-webkit-scrollbar{width:6px}#list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+    #list{flex:1;overflow-y:auto;padding:.3rem;scrollbar-width:thin;scrollbar-color:rgba(123,38,80,.6) transparent}
+    /* themed scrollbars — semi-transparent dark, rounded, floating */
+    #list::-webkit-scrollbar,body::-webkit-scrollbar{width:11px;height:11px}
+    #list::-webkit-scrollbar-track,body::-webkit-scrollbar-track{background:transparent}
+    #list::-webkit-scrollbar-thumb,body::-webkit-scrollbar-thumb{background:rgba(20,8,24,.55);border:3px solid transparent;background-clip:padding-box;border-radius:100px}
+    #list::-webkit-scrollbar-thumb:hover,body::-webkit-scrollbar-thumb:hover{background:rgba(194,65,107,.55);background-clip:padding-box}
+    body{scrollbar-width:thin;scrollbar-color:rgba(123,38,80,.6) transparent}
     .row{display:flex;align-items:center;gap:.6rem;padding:.45rem .6rem;border-radius:8px;cursor:pointer;transition:background .15s}
     .row:hover{background:rgba(255,255,255,.06)}
     .row.active{background:rgba(194,65,107,.16)}
@@ -143,7 +152,7 @@
   <!-- RIGHT -->
   <div id="sidebar">
     <div class="side-head">
-      <div class="side-title"><span id="count">Playlist</span><button id="shuffle">Shuffle</button></div>
+      <div class="side-title"><span id="count">Playlist</span><span class="toggles"><button id="reverse" class="tgl" title="Reverse order">Reverse</button><button id="shuffle" class="tgl" title="Shuffle">Shuffle</button></span></div>
       <input id="search" placeholder="Search title or artist…" />
     </div>
     <div id="list"></div>
@@ -184,7 +193,7 @@ document.addEventListener('visibilitychange',()=>document.hidden?cancelAnimation
 // ───────── PLAYER ─────────
 const $=id=>document.getElementById(id);
 const audio=$('audio');
-let tracks=[], order=[], pos=0, shuffleOn=false, source=null;
+let tracks=[], order=[], pos=0, shuffleOn=false, reverseOn=false, source=null;
 let ytPlayer=null, ytReady=false, spCtrl=null, spReady=false, spAdvanced=false;
 const fmt=s=>{s=Math.floor(s||0);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -268,13 +277,18 @@ audio.addEventListener('timeupdate',()=>{$('bar').value=audio.currentTime;$('t-c
 $('bar').addEventListener('input',e=>audio.currentTime=+e.target.value);
 $('vol').addEventListener('input',e=>audio.volume=e.target.value/100); audio.volume=.8;
 
-// shuffle
+// order toggles — keep the current track selected across reorders
+function applyOrder(o){ const cur=order.length?order[pos]:0; order=o; pos=Math.max(0,order.indexOf(cur)); renderList($('search').value); }
 $('shuffle').addEventListener('click',()=>{
   shuffleOn=!shuffleOn; $('shuffle').classList.toggle('on',shuffleOn);
-  const curIdx=order[pos];
-  if(shuffleOn){ for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]];} }
-  else order=tracks.map((_,i)=>i);
-  pos=order.indexOf(curIdx); renderList(); highlight();
+  let o=tracks.map((_,i)=>i);
+  if(shuffleOn){ for(let i=o.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[o[i],o[j]]=[o[j],o[i]];} }
+  if(reverseOn) o.reverse();
+  applyOrder(o);
+});
+$('reverse').addEventListener('click',()=>{
+  reverseOn=!reverseOn; $('reverse').classList.toggle('on',reverseOn);
+  applyOrder(order.slice().reverse());   // flips whatever's showing (sorted or shuffled), no re-randomize
 });
 
 // list + search
