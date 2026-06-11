@@ -12,21 +12,17 @@
  */
 
 import { Resvg, initWasm } from '@resvg/resvg-wasm';
+import resvgWasm from '@resvg/resvg-wasm/index_bg.wasm';
 
-// Lazy PNG rasterizer for OG cards. wasm + font are fetched at runtime (keeps the
-// Worker bundle small) and cached at the edge. Any failure → caller falls back to SVG.
+// PNG rasterizer for OG cards. wasm is bundled (no runtime fetch); the Barlow font
+// is fetched once from GitHub and edge-cached. Any failure → caller falls back to SVG.
 let _resvgReady = null, _fontBuf = null;
 async function ensureResvg() {
-  if (!_resvgReady) {
-    _resvgReady = (async () => {
-      const w = await fetch('https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.6.2/index_bg.wasm', { cf: { cacheEverything: true, cacheTtl: 604800 } });
-      await initWasm(await w.arrayBuffer());
-    })();
-  }
+  if (!_resvgReady) _resvgReady = initWasm(resvgWasm);
   await _resvgReady;
   if (!_fontBuf) {
     try {
-      const f = await fetch('https://cdn.jsdelivr.net/fontsource/fonts/barlow@latest/latin-500-normal.ttf', { cf: { cacheEverything: true, cacheTtl: 604800 } });
+      const f = await fetch('https://raw.githubusercontent.com/google/fonts/main/ofl/barlow/Barlow-Medium.ttf', { cf: { cacheEverything: true, cacheTtl: 2592000 } });
       if (f.ok) _fontBuf = new Uint8Array(await f.arrayBuffer());
     } catch (e) {}
   }
@@ -97,7 +93,7 @@ const trunc = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 // (standalone SVGs and many social rasterizers won't load external <image href>)
 async function dataUri(url) {
   try {
-    const r = await fetch(url, { cf: { cacheEverything: true, cacheTtl: 86400 } });
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BedtimeTunesOG/1.0)', 'Accept': 'image/*' }, cf: { cacheEverything: true, cacheTtl: 86400 } });
     if (!r.ok) return null;
     const ct = r.headers.get('content-type') || 'image/jpeg';
     const buf = new Uint8Array(await r.arrayBuffer());
@@ -137,8 +133,8 @@ ${logo ? `<image xlink:href="${logo}" x="70" y="235" width="160" height="160" cl
 <rect x="70" y="235" width="160" height="160" rx="24" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
 ${artHref ? `<image xlink:href="${artHref}" x="258" y="165" width="300" height="300" clip-path="url(#ac)" preserveAspectRatio="xMidYMid slice"/>` : ''}
 <rect x="258" y="165" width="300" height="300" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
-<text x="600" y="272" font-family="Barlow, Arial, sans-serif" font-size="60" font-weight="700" fill="#ffffff">${title}</text>
-<text x="600" y="336" font-family="Barlow, Arial, sans-serif" font-size="28" letter-spacing="6" fill="#ffffff" fill-opacity="0.7">${artist}</text>
+<text x="600" y="308" font-family="Barlow, Arial, sans-serif" font-size="60" font-weight="700" fill="#ffffff">${title}</text>
+<text x="600" y="350" font-family="Barlow, Arial, sans-serif" font-size="28" letter-spacing="6" fill="#ffffff" fill-opacity="0.7">${artist}</text>
 <text x="600" y="468" font-family="Barlow, Arial, sans-serif" font-size="24" letter-spacing="10" fill="#ffffff" fill-opacity="0.42">BEDTIME TUNES</text>
 <text x="600" y="500" font-family="Barlow, Arial, sans-serif" font-size="14" letter-spacing="6" fill="#ffffff" fill-opacity="0.3">TUNES TO SNOOZE TO</text>
 </svg>`;
@@ -172,9 +168,12 @@ ${logo ? `<image xlink:href="${logo}" x="500" y="120" width="200" height="200" c
 // shared by /og (SVG) and /og.png (PNG) — builds the right card for an id (or default)
 async function buildOgSvg(env, id) {
   if (id) {
-    const t = await env.DB.prepare(`SELECT id, title, artist, art_url, youtube_id FROM tunes WHERE id=?`).bind(id).first();
+    const t = await env.DB.prepare(`SELECT id, title, artist, art_url, art_key, youtube_id FROM tunes WHERE id=?`).bind(id).first();
     if (t) {
-      const art = t.art_url || (t.youtube_id ? `https://i.ytimg.com/vi/${t.youtube_id}/hqdefault.jpg` : 'https://bedtimetunes.com/bedtimetunes.jpg');
+      const art = t.art_url
+        || (t.art_key ? `https://audio.bedtimetunes.com/${t.art_key}` : null)
+        || (t.youtube_id ? `https://i.ytimg.com/vi/${t.youtube_id}/hqdefault.jpg` : null)
+        || 'https://bedtimetunes.com/bedtimetunes.jpg';
       return await ogCard(t, art);
     }
   }
@@ -791,13 +790,18 @@ export default {
     }
 
     if (path === '/og.png' || path.startsWith('/og.png/')) {
+      const cache = caches.default;
+      const cacheKey = new Request(new URL(url.pathname, url.origin).toString());
+      const hit = await cache.match(cacheKey);
+      if (hit) return hit;
       const id = (path.match(/\/og\.png\/(\d+)/) || [])[1];
       const svg = await buildOgSvg(env, id);
       try {
         const png = await svgToPng(svg);
-        return new Response(png, { headers: { 'content-type': 'image/png', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
+        const resp = new Response(png, { headers: { 'content-type': 'image/png', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
+        ctx.waitUntil(cache.put(cacheKey, resp.clone()));
+        return resp;
       } catch (e) {
-        // rasterizer unavailable → serve the SVG so the card still renders where SVG is accepted
         return new Response(svg, { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=300', 'X-OG-Fallback': 'svg', ...cors(env) } });
       }
     }
