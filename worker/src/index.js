@@ -214,7 +214,7 @@ $('go').addEventListener('click',async function(){
   ['name','email','url'].forEach(function(f){fd.append(f,$(f).value);});
   if($('photo').files[0]) fd.append('photo',$('photo').files[0]);
   try{
-    var r=await fetch('/api/new-user',{method:'POST',credentials:'include',body:fd});
+    var r=await fetch('/admin/api/new-user',{method:'POST',credentials:'include',body:fd});
     var d=await r.json();
     $('msg').textContent = r.ok ? ('Added curator '+d.name+' (id '+d.id+')') : (d.error||'Error '+r.status);
     if(r.ok){ ['name','email','url'].forEach(function(f){$(f).value='';}); $('photo').value=''; }
@@ -290,7 +290,7 @@ hr{border:none;border-top:1px solid rgba(255,255,255,.1);margin:.3rem 0}
 .back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem;text-align:center}</style></head>
 <body><div class="card"><h1>Admin</h1>
 <a class="go" href="/add">♪ Add a tune</a>
-<div class="row"><a class="go" href="/new-user">＋ Curator</a><a class="go" href="/users">👥 Subscribers (${count})</a></div>
+<div class="row"><a class="go" href="/admin/new-user">＋ Curator</a><a class="go" href="/admin/users">👥 Subscribers (${count})</a></div>
 <hr>
 <p class="hint">Broadcast a custom email to all ${count} subscribers.</p>
 <div><label>Subject</label><input id="subject"></div>
@@ -319,14 +319,14 @@ $('send').addEventListener('click',async function(){
   if(!$('subject').value||!$('body').value){$('msg').textContent='Subject and message required';return;}
   if(!confirm('Send to ${count} subscribers?'))return;
   var fd=new FormData();fd.append('subject',$('subject').value);fd.append('body',$('body').value);
-  var d=await post('/api/broadcast',fd,$('msg'));
+  var d=await post('/admin/api/broadcast',fd,$('msg'));
   if(d)$('msg').textContent='Sent to '+d.sent+' of '+d.total;
 });
 $('import').addEventListener('click',async function(){
   var file=$('csvfile').files[0],fd=new FormData();
   if(file)fd.append('file',file);else fd.append('csv',$('csv').value);
   if(!file&&!$('csv').value.trim()){$('imsg').textContent='Paste emails or choose a file';return;}
-  var d=await post('/api/import',fd,$('imsg'));
+  var d=await post('/admin/api/import',fd,$('imsg'));
   if(d)$('imsg').textContent='Added '+d.added+', skipped '+d.skipped+' duplicate(s) — '+d.parsed+' valid email(s) found';
 });
 </script></body></html>`;
@@ -359,7 +359,7 @@ document.querySelectorAll('.act').forEach(function(b){b.addEventListener('click'
   if(a==='remove'&&!confirm('Remove this subscriber permanently?'))return;
   b.textContent='…';
   var fd=new FormData();fd.append('id',id);fd.append('action',a);
-  try{var r=await fetch('/api/subscriber',{method:'POST',credentials:'include',body:fd,redirect:'manual'});
+  try{var r=await fetch('/admin/api/subscriber',{method:'POST',credentials:'include',body:fd,redirect:'manual'});
     if(r.type==='opaqueredirect'||r.status===0){alert('Session expired — reload to sign in again.');return;}
     if(r.ok)location.reload();else alert('Error '+r.status);
   }catch(e){alert('Request failed: '+e.message);}
@@ -394,7 +394,7 @@ export default {
     if (path === '/add' && request.method === 'GET')
       return new Response(ADD_PAGE, { headers: { 'content-type': 'text/html;charset=utf-8' } });
 
-    // curator admin (lock to owner: add /new-user + /api/new-user to the Access app, allow only your email;
+    // curator admin (all owner tools live under /admin/* — one Access include path "/admin" covers them;
     // optionally set OWNER_EMAIL for a second check)
     const ownerOnly = (request) => {
       const e = request.headers.get('Cf-Access-Authenticated-User-Email');
@@ -403,13 +403,13 @@ export default {
       return null;
     };
 
-    if (path === '/new-user' && request.method === 'GET') {
+    if (path === '/admin/new-user' && request.method === 'GET') {
       const bad = ownerOnly(request);
       if (bad) return new Response(bad, { status: 403 });
       return new Response(NEW_USER_PAGE, { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
-    if (path === '/api/new-user' && request.method === 'POST') {
+    if (path === '/admin/api/new-user' && request.method === 'POST') {
       const bad = ownerOnly(request);
       if (bad) return new Response(JSON.stringify({ error: bad }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
       const form = await request.formData();
@@ -437,14 +437,14 @@ export default {
       return new Response(adminPage(c ? c.n : 0), { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
-    if (path === '/users' && request.method === 'GET') {
+    if (path === '/admin/users' && request.method === 'GET') {
       const bad = ownerOnly(request);
       if (bad) return new Response(bad, { status: 403 });
       const { results } = await env.DB.prepare(`SELECT id, email, created_at, unsubscribed, bounced FROM subscribers ORDER BY id DESC`).all();
       return new Response(usersPage(results || []), { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
-    if (path === '/api/subscriber' && request.method === 'POST') {
+    if (path === '/admin/api/subscriber' && request.method === 'POST') {
       const bad = ownerOnly(request);
       if (bad) return new Response(JSON.stringify({ error: bad }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
       const f = await request.formData();
@@ -466,7 +466,7 @@ export default {
       return new Response(html, { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
-    if (path === '/api/import' && request.method === 'POST') {
+    if (path === '/admin/api/import' && request.method === 'POST') {
       const bad = ownerOnly(request);
       if (bad) return new Response(JSON.stringify({ error: bad }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
       let raw = '';
@@ -490,7 +490,7 @@ export default {
       return Response.json({ parsed: emails.length, added, skipped: emails.length - added }, { headers: cors(env) });
     }
 
-    if (path === '/api/broadcast' && request.method === 'POST') {
+    if (path === '/admin/api/broadcast' && request.method === 'POST') {
       const bad = ownerOnly(request);
       if (bad) return new Response(JSON.stringify({ error: bad }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
       const f = await request.formData();
@@ -537,7 +537,7 @@ export default {
       if (!email) return new Response(JSON.stringify({ error: 'Not behind Access' }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
       let uploader;
       const known = await env.DB.prepare(`SELECT id FROM uploaders WHERE email = ?`).bind(email.toLowerCase()).first();
-      if (known) uploader = known.id;                       // curator added via /new-user
+      if (known) uploader = known.id;                       // curator added via /admin/new-user
       else { let map = {}; try { map = JSON.parse(env.CONTRIBUTORS || '{}'); } catch {} uploader = map[email] ?? parseInt(env.DEFAULT_UPLOADER || '2', 10); }
       const nextId = (await env.DB.prepare(`SELECT COALESCE(MAX(id),146)+1 AS n FROM tunes`).first()).n;
 
