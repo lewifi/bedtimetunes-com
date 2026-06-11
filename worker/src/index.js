@@ -164,6 +164,7 @@ button.go{background:linear-gradient(135deg,#c2416b,#7b2650);border:none;color:#
 <div><label>Genre</label><input id="genre"></div>
 <div><label>Description (a short blurb shown with the tune)</label><textarea id="description" rows="2"></textarea></div>
 <div><label>Notes / backstory (historical)</label><textarea id="historical" rows="2"></textarea></div>
+<label style="display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-size:.85rem;color:rgba(255,255,255,.75)"><input type="checkbox" id="notify" checked style="width:auto"> Email subscribers about this new tune</label>
 <button class="go" id="go">Add to playlist</button><div id="msg"></div></div>
 <script>
 var $=function(i){return document.getElementById(i)};
@@ -174,6 +175,7 @@ $('go').addEventListener('click',async function(){
   TEXT.forEach(function(f){fd.append(f,$(f).value);});
   if($('mp3').files[0]) fd.append('mp3',$('mp3').files[0]);
   if($('image').files[0]) fd.append('image',$('image').files[0]);
+  if($('notify').checked) fd.append('notify','1');
   try{
     var r=await fetch('/api/add',{method:'POST',credentials:'include',body:fd});
     var d=await r.json();
@@ -232,12 +234,103 @@ a.go{display:block;text-decoration:none;width:100%}
 <h1 class="brand">Bedtime Tunes<small>curator tools</small></h1>
 <p class="hint">Add tunes to the collection, or set up a new curator.</p>
 <a class="go" href="/add">♪ Add a tune</a>
-<a class="go" href="/new-user">＋ Add a curator</a>
+<a class="go" href="/admin">⚙ Admin</a>
 <a class="back" href="https://bedtimetunes.com">← back to the player</a>
 </div></body></html>`;
 
+const slugify = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const newToken = () => crypto.randomUUID().replace(/-/g, '');
+
+// send one templated email to every active subscriber (graceful no-op if EMAIL unset)
+async function emailList(env, subject, render) {
+  if (!env.EMAIL) return { sent: 0, total: 0, note: 'EMAIL binding not configured' };
+  const { results } = await env.DB.prepare(`SELECT email, token FROM subscribers WHERE COALESCE(unsubscribed,0)=0`).all();
+  let sent = 0;
+  for (const s of results) {
+    const unsub = `https://audio.bedtimetunes.com/unsubscribe?t=${s.token}`;
+    const { html, text } = render(s, unsub);
+    try { await env.EMAIL.send({ from: env.MAIL_FROM || 'tunes@bedtimetunes.com', to: s.email, subject, html, text }); sent++; } catch (e) {}
+  }
+  return { sent, total: results.length };
+}
+
+function mailShell(inner, unsub) {
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#0d0510">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0d0510"><tr><td align="center" style="padding:28px 16px">
+<table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;background:#160a1a;border:1px solid #2a1830;border-radius:16px">
+<tr><td style="padding:26px 28px 0;font-family:Arial,sans-serif;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:#c2416b;font-weight:bold">Bedtime Tunes</td></tr>
+<tr><td style="padding:16px 28px 26px;font-family:Arial,sans-serif;color:#e8dce8;font-size:15px;line-height:1.6">${inner}</td></tr>
+<tr><td style="padding:0 28px 24px;font-family:Arial,sans-serif;color:#6b5b6b;font-size:11px;line-height:1.5">You're receiving this because you subscribed to Bedtime Tunes updates.<br><a href="${unsub}" style="color:#9a6b85">Unsubscribe</a></td></tr>
+</table></td></tr></table></body></html>`;
+}
+
+function newSongEmail(track, unsub) {
+  const play = `https://audio.bedtimetunes.com/s/${track.id}-${slugify(track.artist)}-${slugify(track.title)}`;
+  const inner = `<p style="margin:0 0 8px;color:#9a8a9a;font-size:12px;letter-spacing:2px;text-transform:uppercase">A new tune was added</p>
+<h1 style="margin:0 0 4px;font-size:24px;color:#ffffff">${xml(track.title)}</h1>
+<p style="margin:0 0 22px;color:#b9a9b9;font-size:14px;letter-spacing:1px">${xml(track.artist)}</p>
+<a href="${play}" style="display:inline-block;background:#c2416b;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:100px;font-size:13px;letter-spacing:2px;text-transform:uppercase">&#9654; Listen now</a>`;
+  return { html: mailShell(inner, unsub), text: `A new tune on Bedtime Tunes:\n${track.title} — ${track.artist}\n\nListen: ${play}\n\nUnsubscribe: ${unsub}` };
+}
+
+function broadcastEmail(body, unsub) {
+  const safe = xml(body).replace(/\n/g, '<br>');
+  return { html: mailShell(`<div style="font-size:15px;line-height:1.6;color:#e8dce8">${safe}</div>`, unsub), text: `${body}\n\nUnsubscribe: ${unsub}` };
+}
+
+function adminPage(count) {
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin · Bedtime Tunes</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
+<style>${FORM_CSS}
+a.go{display:block;text-decoration:none;text-align:center}
+.row{display:flex;gap:.5rem}.row a{flex:1}
+textarea{width:100%;min-height:120px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:.6rem .7rem;color:#fff;font-family:'Josefin Sans',sans-serif;font-size:.9rem;outline:none}
+hr{border:none;border-top:1px solid rgba(255,255,255,.1);margin:.3rem 0}
+.back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem;text-align:center}</style></head>
+<body><div class="card"><h1>Admin</h1>
+<a class="go" href="/add">♪ Add a tune</a>
+<div class="row"><a class="go" href="/new-user">＋ Curator</a><a class="go" href="/users">👥 Subscribers (${count})</a></div>
+<hr>
+<p class="hint">Broadcast a custom email to all ${count} subscribers.</p>
+<div><label>Subject</label><input id="subject"></div>
+<div><label>Message</label><textarea id="body"></textarea></div>
+<button class="go" id="send">Send broadcast</button><div id="msg"></div>
+<a class="back" href="https://bedtimetunes.com">← back to the player</a></div>
+<script>
+var $=function(i){return document.getElementById(i)};
+$('send').addEventListener('click',async function(){
+  if(!$('subject').value||!$('body').value){$('msg').textContent='Subject and message required';return;}
+  if(!confirm('Send to ${count} subscribers?'))return;
+  $('msg').textContent='Sending…';
+  var fd=new FormData();fd.append('subject',$('subject').value);fd.append('body',$('body').value);
+  try{var r=await fetch('/api/broadcast',{method:'POST',credentials:'include',body:fd});var d=await r.json();
+  $('msg').textContent=r.ok?('Sent to '+d.sent+' of '+d.total):(d.error||'Error '+r.status);}
+  catch(e){$('msg').textContent='Network error';}
+});
+</script></body></html>`;
+}
+
+function usersPage(rows) {
+  const trs = rows.map(r => `<tr><td>${r.id}</td><td>${xml(r.email)}</td><td>${(r.created_at || '').slice(0, 10)}</td><td>${r.unsubscribed ? '<span style="color:#9a6b6b">unsubscribed</span>' : '<span style="color:#7bbf7b">active</span>'}</td></tr>`).join('');
+  const active = rows.filter(r => !r.unsubscribed).length;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Subscribers · Bedtime Tunes</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
+<style>${FORM_CSS}
+.card{max-width:680px}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid rgba(255,255,255,.08)}
+th{font-family:'Barlow';font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+.back{color:rgba(255,255,255,.5);text-decoration:none;font-size:.8rem}</style></head>
+<body><div class="card"><h1>Subscribers</h1>
+<p class="hint">${active} active · ${rows.length} total</p>
+<table><thead><tr><th>#</th><th>Email</th><th>Joined</th><th>Status</th></tr></thead><tbody>${trs || '<tr><td colspan="4" style="color:rgba(255,255,255,.4)">No subscribers yet.</td></tr>'}</tbody></table>
+<a class="back" href="/admin">← back to admin</a></div></body></html>`;
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const path = url.pathname;
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors(env) });
@@ -284,6 +377,31 @@ export default {
       return Response.json({ id: nid, name, email: cemail, photo }, { headers: cors(env) });
     }
 
+    if (path === '/admin' && request.method === 'GET') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(bad, { status: 403 });
+      const c = await env.DB.prepare(`SELECT COUNT(*) n FROM subscribers WHERE COALESCE(unsubscribed,0)=0`).first().catch(() => null);
+      return new Response(adminPage(c ? c.n : 0), { headers: { 'content-type': 'text/html;charset=utf-8' } });
+    }
+
+    if (path === '/users' && request.method === 'GET') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(bad, { status: 403 });
+      const { results } = await env.DB.prepare(`SELECT id, email, created_at, unsubscribed FROM subscribers ORDER BY id DESC`).all();
+      return new Response(usersPage(results || []), { headers: { 'content-type': 'text/html;charset=utf-8' } });
+    }
+
+    if (path === '/api/broadcast' && request.method === 'POST') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(JSON.stringify({ error: bad }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
+      const f = await request.formData();
+      const subject = (f.get('subject') || '').toString().trim();
+      const body = (f.get('body') || '').toString().trim();
+      if (!subject || !body) return new Response(JSON.stringify({ error: 'Subject and message required' }), { status: 400, headers: { ...cors(env), 'content-type': 'application/json' } });
+      const r = await emailList(env, subject, (s, unsub) => broadcastEmail(body, unsub));
+      return Response.json(r, { headers: cors(env) });
+    }
+
     if (path === '/api/tracks' && request.method === 'GET') {
       const { results } = await env.DB.prepare(
         `SELECT t.id, t.title, t.artist, t.genre, t.description, t.historical, t.uploader_id,
@@ -326,11 +444,12 @@ export default {
 
       const ctype = request.headers.get('content-type') || '';
       let f = { title: '', artist: '', genre: '', description: '', historical: '' };
-      let src = {}, mp3_key = null, art_key = null;
+      let src = {}, mp3_key = null, art_key = null, notify = false;
 
       if (ctype.includes('multipart/form-data')) {
         const form = await request.formData();
         for (const k of Object.keys(f)) f[k] = form.get(k) || '';
+        notify = !!form.get('notify');
         src = parseSource(form.get('url') || '');               // link, if supplied
         const mp3 = form.get('mp3'), image = form.get('image'); // file(s), if supplied
         if ((mp3 && mp3.size) || (image && image.size)) {
@@ -350,6 +469,7 @@ export default {
       } else {
         const body = await request.json().catch(() => ({}));
         f = { ...f, ...body };
+        notify = !!body.notify;
         src = parseSource(body.url || '');
       }
 
@@ -365,7 +485,33 @@ export default {
              f.description || '', f.historical || '', uploader,
              mp3_key, src.youtube_id ?? null, src.spotify_id ?? null, art_key,
              new Date().toISOString()).run();
-      return Response.json({ id: nextId, by: email, uploader, mp3_key, art_key, ...src }, { headers: cors(env) });
+      if (notify) ctx.waitUntil(emailList(env, `New tune: ${f.title || 'Untitled'} — ${f.artist || ''}`.trim(),
+        (s, unsub) => newSongEmail({ id: nextId, title: f.title || '(untitled)', artist: f.artist || '' }, unsub)));
+      return Response.json({ id: nextId, by: email, uploader, mp3_key, art_key, notified: notify, ...src }, { headers: cors(env) });
+    }
+
+    // ── mailing list: public subscribe / unsubscribe ──
+    if (path === '/api/subscribe' && request.method === 'POST') {
+      let email = '';
+      const ct = request.headers.get('content-type') || '';
+      if (ct.includes('application/json')) { const b = await request.json().catch(() => ({})); email = (b.email || '').toString(); }
+      else { const f = await request.formData(); email = (f.get('email') || '').toString(); }
+      email = email.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+        return Response.json({ error: 'Please enter a valid email' }, { status: 400, headers: cors(env) });
+      await env.DB.prepare(`INSERT INTO subscribers (email, created_at, token, unsubscribed) VALUES (?,?,?,0)
+                            ON CONFLICT(email) DO UPDATE SET unsubscribed=0`)
+        .bind(email, new Date().toISOString(), newToken()).run();
+      return Response.json({ ok: true }, { headers: cors(env) });
+    }
+
+    if (path === '/unsubscribe' && request.method === 'GET') {
+      const t = url.searchParams.get('t');
+      if (t) await env.DB.prepare(`UPDATE subscribers SET unsubscribed=1 WHERE token=?`).bind(t).run();
+      return new Response(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Unsubscribed</title>
+<style>body{background:#160a1a;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;padding:1rem}a{color:#e8739a}</style></head>
+<body><div><h2 style="font-weight:400">You've been unsubscribed.</h2><p style="color:rgba(255,255,255,.6)">You won't get any more emails from Bedtime Tunes.<br><a href="https://bedtimetunes.com">← back to the player</a></p></div></body></html>`,
+        { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
     // share page — per-track Open Graph card, then bounce to the player

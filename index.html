@@ -64,6 +64,8 @@
     .pill-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.45rem;margin-top:.5rem}
     .pill-cta{background:linear-gradient(135deg,rgba(194,65,107,.4),rgba(123,38,80,.4));border:1px solid rgba(194,65,107,.6);color:#fff;border-radius:100px;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.16em;text-transform:uppercase;padding:.3rem .85rem;cursor:pointer;transition:all .2s;animation:pillglow 3.5s ease-in-out infinite}
     .pill-cta:hover{background:linear-gradient(135deg,rgba(194,65,107,.65),rgba(123,38,80,.65));box-shadow:0 0 24px rgba(194,65,107,.6)}
+    .pill-cta.alt{background:linear-gradient(135deg,rgba(224,144,44,.32),rgba(212,102,58,.32));border-color:rgba(224,144,44,.6);animation:none}
+    .pill-cta.alt:hover{background:linear-gradient(135deg,rgba(224,144,44,.55),rgba(212,102,58,.55));box-shadow:0 0 24px rgba(224,144,44,.55)}
     @keyframes pillglow{0%,100%{box-shadow:0 0 0 rgba(194,65,107,0)}50%{box-shadow:0 0 16px rgba(194,65,107,.4)}}
     .uploader{display:flex;align-items:center;justify-content:center;gap:.45rem;margin-top:.55rem;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.4);min-height:1rem}
     .desc-wrap{position:relative;display:inline-block;margin-top:.6rem}
@@ -182,6 +184,7 @@
         <div class="pill-row">
           <button id="switch" class="switch-btn hidden"></button>
           <button id="curator-pill" class="pill-cta" type="button">✦ become a curator</button>
+          <button id="subscribe-pill" class="pill-cta alt" type="button">🔔 get new-song alerts</button>
         </div>
         <div id="notice"></div>
       </div>
@@ -231,12 +234,23 @@
   </div>
 </div>
 
+<div id="subscribe-modal" class="modal hidden">
+  <div class="modal-card">
+    <button id="subscribe-close" class="modal-x" aria-label="Close">&times;</button>
+    <h2>New-song alerts</h2>
+    <p>Get a short email whenever a new tune is added to the collection. No spam, unsubscribe anytime.</p>
+    <input id="subscribe-email" type="email" placeholder="you@example.com" style="width:100%;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:.7rem .8rem;color:#fff;font-size:.95rem;outline:none"/>
+    <button id="subscribe-go" class="modal-apply" type="button">Subscribe</button>
+    <div id="subscribe-msg" style="font-size:.8rem;min-height:1rem;text-align:center;color:rgba(255,255,255,.7)"></div>
+  </div>
+</div>
+
 <audio id="audio" preload="metadata"></audio>
 <script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
 // ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
-const VERSION='v3.0.12', BUILD_DATE='2026-06-11';
+const VERSION='v3.0.13', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
 const SPOTIFY_PLAYLIST_URL='https://open.spotify.com/playlist/6AGKG8W0y4xezu8Cl6Rtkj';
 document.getElementById('sp-playlist').href=SPOTIFY_PLAYLIST_URL;
@@ -251,6 +265,22 @@ document.getElementById('ver').textContent=VERSION;
   document.getElementById('curator-pill').addEventListener('click',e=>{e.preventDefault();m.classList.remove('hidden');});
   document.getElementById('curator-close').addEventListener('click',()=>m.classList.add('hidden'));
   m.addEventListener('click',e=>{ if(e.target===m) m.classList.add('hidden'); });
+  // subscribe modal
+  const sm=document.getElementById('subscribe-modal');
+  document.getElementById('subscribe-pill').addEventListener('click',e=>{e.preventDefault();sm.classList.remove('hidden');});
+  document.getElementById('subscribe-close').addEventListener('click',()=>sm.classList.add('hidden'));
+  sm.addEventListener('click',e=>{ if(e.target===sm) sm.classList.add('hidden'); });
+  document.getElementById('subscribe-go').addEventListener('click',async()=>{
+    const email=document.getElementById('subscribe-email').value.trim();
+    const msg=document.getElementById('subscribe-msg');
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ msg.textContent='Please enter a valid email'; return; }
+    msg.textContent='Subscribing…';
+    try{
+      const r=await fetch(`${API_BASE}/api/subscribe`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+      msg.textContent = r.ok ? 'Subscribed ✓ — see you at bedtime.' : 'Something went wrong, try again.';
+      if(r.ok) document.getElementById('subscribe-email').value='';
+    }catch(e){ msg.textContent='Network error'; }
+  });
 })();
 </script>
 <script>
