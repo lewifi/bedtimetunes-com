@@ -33,10 +33,11 @@
     .now{width:100%;max-width:480px;display:flex;flex-direction:column;align-items:center;gap:1rem}
     /* media area swaps between mp3 art / youtube / spotify */
     .media{width:100%;display:flex;justify-content:center}
-    #art-wrap{width:min(280px,60vw);height:min(280px,60vw);border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#c2416b,#7b2650);box-shadow:0 0 80px rgba(192,65,107,.5),0 20px 60px rgba(0,0,0,.6);animation:float 8s ease-in-out infinite;transition:box-shadow .6s}
+    #art-wrap{width:min(280px,60vw);height:min(280px,60vw);border-radius:14px;overflow:hidden;background:url('/bedtimetunes.jpg') center/cover no-repeat,linear-gradient(135deg,#c2416b,#7b2650);box-shadow:0 0 80px rgba(192,65,107,.5),0 20px 60px rgba(0,0,0,.6);animation:float 8s ease-in-out infinite;transition:box-shadow .6s}
     #art-wrap.playing{box-shadow:0 0 110px rgba(192,65,107,.75),0 0 200px rgba(192,65,107,.2),0 20px 60px rgba(0,0,0,.6)}
     #art{width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .6s}#art.on{opacity:1}
-    #yt-wrap{width:100%;max-width:480px;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+    .now.wide{max-width:min(920px,94vw)}
+    #yt-wrap{width:100%;max-width:min(900px,calc((100vh - 300px)*16/9));max-height:calc(100vh - 300px);aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#000 url('/bedtimetunes.jpg') center/cover no-repeat;box-shadow:0 20px 60px rgba(0,0,0,.6)}
     #yt-host{width:100%;height:100%}
     #sp-wrap{width:100%;max-width:480px}
     #sp-host{width:100%;min-height:152px;border-radius:12px;overflow:hidden}
@@ -49,6 +50,8 @@
     .src-badge{display:inline-block;margin-top:.5rem;font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.2em;text-transform:uppercase;padding:.2rem .6rem;border-radius:100px;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.55)}
     #notice{font-size:.62rem;letter-spacing:.06em;color:rgba(232,160,90,.95);margin-top:.6rem;min-height:1rem;text-align:center}
     #notice a{color:#fff;text-decoration:underline}
+    .estimate{font-size:.5rem;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.35);padding:.1rem .9rem .4rem}
+    .ver{opacity:.4;font-size:.9em}
 
     .progress{width:100%;max-width:480px;display:flex;flex-direction:column;gap:.35rem}
     #bar{width:100%;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:rgba(255,255,255,.12);cursor:pointer;outline:none}
@@ -100,10 +103,14 @@
     .logo-tip:hover .tip{opacity:1}
 
     @media(max-width:820px){
-      #app{flex-direction:column;height:auto;min-height:100vh;overflow:visible}
-      html,body{overflow:auto}
-      #sidebar{max-width:none;min-width:0;height:50vh}
-      #stage{padding-top:2rem}
+      html,body{overflow:hidden}
+      #app{flex-direction:column;height:100vh;gap:.6rem;padding:.6rem}
+      #stage{flex:none;flex-shrink:0;max-height:56vh;overflow:hidden;padding:.6rem;gap:.7rem;position:sticky;top:0}
+      .now{gap:.6rem}
+      #art-wrap{width:min(150px,38vw);height:min(150px,38vw)}
+      #yt-wrap{max-width:100%;max-height:34vh}
+      .now.wide{max-width:100%}
+      #sidebar{flex:1;min-width:0;max-width:none;min-height:0;height:auto}
     }
   </style>
 </head>
@@ -141,6 +148,8 @@
           <svg id="ic-pause" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></button>
         <button class="cbtn" id="next" title="Next">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2V6z"/></svg></button>
+        <button class="cbtn" id="share" title="Share this tune">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18 16a3 3 0 0 0-2.3 1.1l-7-4a3 3 0 0 0 0-2.2l7-4A3 3 0 1 0 15 5l-7 4a3 3 0 1 0 0 6l7 4A3 3 0 1 0 18 16z"/></svg></button>
       </div>
       <div class="volume" id="mp3-volume">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3z"/></svg>
@@ -152,12 +161,14 @@
   <!-- RIGHT -->
   <div id="sidebar">
     <div class="side-head">
-      <div class="side-title"><span id="count">Playlist</span><span class="toggles"><button id="reverse" class="tgl" title="Reverse order">Reverse</button><button id="shuffle" class="tgl" title="Shuffle">Shuffle</button></span></div>
+      <div class="side-title"><span id="count">tunes</span><span class="toggles"><button id="reverse" class="tgl" title="Reverse order">Reverse</button><button id="shuffle" class="tgl" title="Shuffle">Shuffle</button></span></div>
+      <div id="estimate" class="estimate"></div>
       <input id="search" placeholder="Search title or artist…" />
     </div>
     <div id="list"></div>
     <div class="foot">made by <a href="https://lewi.fi" target="_blank" rel="noopener">lewi.fi</a> &middot;
-      <a id="sp-playlist" href="#" target="_blank" rel="noopener">open in spotify ↗</a></div>
+      <a id="sp-playlist" href="#" target="_blank" rel="noopener">open in spotify ↗</a>
+      <span id="ver" class="ver"></span></div>
   </div>
 </div>
 
@@ -165,10 +176,12 @@
 <script src="https://www.youtube.com/iframe_api"></script>
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
-// ── CONFIG ──
+// ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
+const VERSION='v3.0.3', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
 const SPOTIFY_PLAYLIST_URL='https://open.spotify.com/playlist/6AGKG8W0y4xezu8Cl6Rtkj';
 document.getElementById('sp-playlist').href=SPOTIFY_PLAYLIST_URL;
+document.getElementById('ver').textContent=VERSION;
 </script>
 <script>
 /* aurora + stars + particles (same shell) */
@@ -197,41 +210,65 @@ let tracks=[], order=[], pos=0, shuffleOn=false, reverseOn=false, source=null;
 let ytPlayer=null, ytReady=false, spCtrl=null, spReady=false, spAdvanced=false;
 const fmt=s=>{s=Math.floor(s||0);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const sourceOf=t=> t.mp3_key?'mp3' : t.youtube_id?'youtube' : t.spotify_id?'spotify' : null;
+const sourceOf=t=> t.youtube_id?'youtube' : t.mp3_key?'mp3' : t.spotify_id?'spotify' : null;
 const srcIcon=s=> s==='mp3'?'♪' : s==='youtube'?'▶' : s==='spotify'?'⠿' : '·';
 
 async function init(){
   try{ tracks=await (await fetch(`${API_BASE}/api/tracks`)).json(); }catch(e){ $('t-title').textContent='Could not load playlist'; return; }
   order=tracks.map((_,i)=>i);
-  $('count').textContent=`${tracks.length} tracks`;
+  $('count').textContent=`${tracks.length} tunes`;
+  // estimate total catalogue length from duration_ms
+  const totalMs=tracks.reduce((s,t)=>s+(+t.duration_ms||0),0);
+  const mins=Math.floor(totalMs/60000), d=Math.floor(mins/1440), h=Math.floor((mins%1440)/60), m=mins%60;
+  $('estimate').textContent = totalMs ? `≈ ${d}d ${h}h ${m}m of music` : '';
   renderList();
-  cue(0); // owned first = MP3 = fast start (plays on first gesture)
+  if(!cueFromHash(false)) cue(0); // deep-link #id, else start at top
 }
+// map a track id (from #hash) to a position in the current order
+function cueFromHash(autoplay){
+  const id=(location.hash.match(/\d+/)||[])[0];
+  if(!id) return false;
+  const p=order.findIndex(oi=>String(tracks[oi].id)===id);
+  if(p<0) return false;
+  cue(p, autoplay);
+  return true;
+}
+window.addEventListener('hashchange',()=>cueFromHash(true));
 
 // YouTube / Spotify API ready hooks
 window.onYouTubeIframeAPIReady=()=>{ ytPlayer=new YT.Player('yt-host',{height:'100%',width:'100%',
   playerVars:{autoplay:0,modestbranding:1,rel:0,playsinline:1},
-  events:{onReady:()=>ytReady=true, onStateChange:e=>{ if(e.data===YT.PlayerState.ENDED) next(); }}}); };
+  events:{onReady:()=>ytReady=true, onStateChange:e=>{
+    if(source==='youtube') setIcon(e.data===YT.PlayerState.PLAYING);
+    if(e.data===YT.PlayerState.ENDED) next();
+  }}}); };
 window.onSpotifyIframeApiReady=(API)=>{ API.createController($('sp-host'),{width:'100%',height:'152'},c=>{
   spCtrl=c; spReady=true;
   c.addListener('playback_update',e=>{
     if(source!=='spotify') return;
+    setIcon(!e.data.isPaused);
     const p=e.data.position||0;
     if(p>=29000 && !spAdvanced){ spAdvanced=true; $('notice').innerHTML='Preview ended — <a href="'+SPOTIFY_PLAYLIST_URL+'" target="_blank">log in to Spotify</a> for the full track'; setTimeout(next,1200); }
   });
 }); };
 
+function setIcon(playing){
+  $('ic-play').style.display = playing?'none':'';
+  $('ic-pause').style.display = playing?'':'none';
+  $('art-wrap').classList.toggle('playing', playing);
+}
 function showSource(s){
   source=s;
   $('art-wrap').classList.toggle('hidden', s!=='mp3');
   $('yt-wrap').classList.toggle('hidden', s!=='youtube');
   $('sp-wrap').classList.toggle('hidden', s!=='spotify');
-  // mp3-only controls
+  document.querySelector('.now').classList.toggle('wide', s==='youtube'); // give YT room
   const mp3=s==='mp3';
   $('mp3-progress').style.display=mp3?'':'none';
   $('mp3-volume').style.display=mp3?'':'none';
-  $('play').style.display=mp3?'':'none';   // yt/spotify embeds carry their own play button
+  $('play').style.display='';            // HTML play/pause now drives mp3, youtube & spotify
   $('src-badge').textContent=s?('source: '+s):'';
+  setIcon(false);
 }
 
 function cue(p, autoplay){
@@ -244,6 +281,12 @@ function cue(p, autoplay){
   $('t-genre').textContent=t.genre||'';
   showSource(s);
   highlight();
+  history.replaceState(null,'',location.pathname+'#'+t.id); // neat shareable URL
+
+  // resolved cover art (art_url = external e.g. spotify/youtube; art_key = our B2 image); logo shows behind if none
+  const art=$('art'), img=t.art_url || (t.art_key?`${AUDIO_BASE}/${t.art_key}`:'');
+  art.classList.remove('on');
+  if(img){ art.src=img; art.onload=()=>art.classList.add('on'); } else { art.removeAttribute('src'); }
 
   // stop others
   audio.pause();
@@ -251,11 +294,10 @@ function cue(p, autoplay){
   if(spCtrl&&s!=='spotify') try{spCtrl.pause()}catch(e){}
 
   if(s==='mp3'){
-    const art=$('art'); if(t.art_key){art.src=`${AUDIO_BASE}/${t.art_key}`;art.onload=()=>art.classList.add('on');} else {art.removeAttribute('src');art.classList.remove('on');}
     audio.src=`${AUDIO_BASE}/${t.mp3_key}`;
     if(autoplay) audio.play().catch(()=>{});
   } else if(s==='youtube'){
-    if(ytReady) ytPlayer.loadVideoById(t.youtube_id); // autoplays
+    if(ytReady) ytPlayer.loadVideoById(t.youtube_id);
     else setTimeout(()=>ytReady&&ytPlayer.loadVideoById(t.youtube_id),600);
   } else if(s==='spotify'){
     const load=()=>{ spCtrl.loadUri('spotify:track:'+t.spotify_id); spCtrl.play(); };
@@ -265,12 +307,25 @@ function cue(p, autoplay){
 function next(){ cue(pos+1, true); }
 function prev(){ cue(pos-1, true); }
 
-// transport (mp3 custom controls; yt/spotify use their own embed buttons)
-$('play').addEventListener('click',()=>{ source==='mp3' && (audio.paused?audio.play():audio.pause()); });
+// transport — one play/pause button drives mp3, youtube and spotify
+$('play').addEventListener('click',()=>{
+  if(source==='mp3'){ audio.paused?audio.play():audio.pause(); }
+  else if(source==='youtube' && ytReady){
+    const st=ytPlayer.getPlayerState();
+    (st===YT.PlayerState.PLAYING)?ytPlayer.pauseVideo():ytPlayer.playVideo();
+  }
+  else if(source==='spotify' && spCtrl){ spCtrl.togglePlay(); }
+});
 $('next').addEventListener('click',next);
 $('prev').addEventListener('click',prev);
-audio.addEventListener('play',()=>{ $('ic-play').style.display='none';$('ic-pause').style.display='';$('art-wrap').classList.add('playing'); });
-audio.addEventListener('pause',()=>{ $('ic-play').style.display='';$('ic-pause').style.display='none';$('art-wrap').classList.remove('playing'); });
+$('share').addEventListener('click',async()=>{
+  const t=tracks[order[pos]];
+  const url=`${location.origin}/#${t.id}`;
+  try{ await navigator.clipboard.writeText(url); $('notice').textContent='link copied ✓'; setTimeout(()=>{if($('notice').textContent==='link copied ✓')$('notice').textContent='';},2000); }
+  catch(e){ prompt('Copy this link:', url); }
+});
+audio.addEventListener('play',()=>setIcon(true));
+audio.addEventListener('pause',()=>setIcon(false));
 audio.addEventListener('ended',next);
 audio.addEventListener('loadedmetadata',()=>{$('bar').max=audio.duration||100;$('t-tot').textContent=fmt(audio.duration)});
 audio.addEventListener('timeupdate',()=>{$('bar').value=audio.currentTime;$('t-cur').textContent=fmt(audio.currentTime)});

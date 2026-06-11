@@ -49,24 +49,26 @@ try:
     print(f"yt-dlp {v.stdout.strip()}", file=sys.stderr)
 except FileNotFoundError:
     sys.exit("yt-dlp not found on PATH. Install it:  pip install yt-dlp   (then reopen the shell)")
-todo = [t for t in tracks if not t.get("mp3_key") and not t.get("youtube_id")][: args.limit]
+todo = [t for t in tracks if not t.get("youtube_id")][: args.limit]   # incl. owned mp3 tracks → youtube-first
 print(f"{len(todo)} tracks to resolve (cap {args.limit})", file=sys.stderr)
 
-updates = []
-found = 0
-for i, t in enumerate(todo, 1):
-    vid = yt_search(f"{t['artist']} {t['title']}")
-    print(f"  [{i}/{len(todo)}] id={t['id']} {t['artist']} – {t['title']} -> {vid or 'MISS'}", file=sys.stderr)
-    if vid:
-        found += 1
-        updates.append({"id": int(t["id"]), "youtube_id": vid})
-
-print(f"resolved {found}/{len(todo)} (the rest had no YouTube hit)", file=sys.stderr)
-if updates:
-    body = json.dumps(updates).encode()
-    res = http(f"{args.base}/api/sync", data=body,
+FLUSH_EVERY = 25
+def sync(items):
+    if not items: return
+    res = http(f"{args.base}/api/sync", data=json.dumps(items).encode(),
                headers={"Authorization": f"Bearer {args.token}", "Content-Type": "application/json"})
-    print(f"sync response: {res}", file=sys.stderr)
-    print(f"synced: updated={res.get('updated')} missing={res.get('missing')}", file=sys.stderr)
-else:
-    print("nothing resolved -> nothing sent (yt-dlp returned no video ids)", file=sys.stderr)
+    print(f"  ↳ synced batch of {len(items)}: updated={res.get('updated')} missing={res.get('missing')}", file=sys.stderr)
+
+batch, found = [], 0
+try:
+    for i, t in enumerate(todo, 1):
+        vid = yt_search(f"{t['artist']} {t['title']}")
+        print(f"  [{i}/{len(todo)}] id={t['id']} {t['artist']} – {t['title']} -> {vid or 'MISS'}", file=sys.stderr)
+        if vid:
+            found += 1
+            batch.append({"id": int(t["id"]), "youtube_id": vid})
+            if len(batch) >= FLUSH_EVERY:
+                sync(batch); batch = []
+finally:
+    sync(batch)   # flush whatever's pending — runs even on Ctrl-C
+print(f"resolved {found}/{len(todo)} (rest had no YouTube hit)", file=sys.stderr)
