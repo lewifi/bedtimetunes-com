@@ -253,20 +253,25 @@ a.go:hover{background:rgba(194,65,107,.25);border-color:rgba(194,65,107,.85);col
 .back.top{align-self:flex-start;margin-bottom:.5rem}
 #msg{font-size:.8rem;min-height:1.2rem;text-align:center}`;
 
-const NEW_USER_PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Add a curator · Bedtime Tunes</title>
+function newUserPage(c) {
+  const v = (s) => xml(s || '');
+  const editing = !!c;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${editing ? 'Edit' : 'Add'} curator · Bedtime Tunes</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
 <style>${FORM_CSS}
 .preview{display:none;margin:.3rem auto;width:120px;height:120px;border-radius:14px;object-fit:cover;border:1px solid rgba(255,255,255,.15)}
 .preview.show{display:block}</style></head>
-<body><div class="card"><a class="back top" href="/admin">← back to admin</a><h1>Add a curator</h1>
+<body><div class="card"><a class="back top" href="/admin/curators">← back to curators</a><h1>${editing ? 'Edit curator' : 'Add a curator'}</h1>
 <p class="hint">Links a Cloudflare Access login to the curator name shown on their tracks. They must also be added to the Access policy in Zero Trust to reach /add.</p>
-<div><label>Name (shown on tracks)</label><input id="name"></div>
-<div><label>Cloudflare Access email</label><input id="email" type="email" placeholder="they@example.com"></div>
-<div><label>Link (optional — site/socials)</label><input id="url" placeholder="https://…"></div>
+${editing ? `<input type="hidden" id="cid" value="${c.id}">` : ''}
+<div><label>Name (shown on tracks)</label><input id="name" value="${v(c && c.name)}"></div>
+<div><label>Location (shown on tracks)</label><input id="location" placeholder="e.g. Berlin, DE" value="${v(c && c.location)}"></div>
+<div><label>Cloudflare Access email</label><input id="email" type="email" placeholder="they@example.com" value="${v(c && c.email)}"></div>
+<div><label>Link (optional — site/socials)</label><input id="url" placeholder="https://…" value="${v(c && c.url)}"></div>
 <div><label>Photo (optional — auto-cropped to a 200×200 square)</label><input id="photo" type="file" accept="image/*"></div>
-<img id="preview" class="preview" alt="">
-<button class="go" id="go">Add curator</button><div id="msg"></div></div>
+<img id="preview" class="preview ${c && c.photo ? 'show' : ''}" alt="" src="${c && c.photo ? `https://audio.bedtimetunes.com/${c.photo}` : ''}">
+<button class="go" id="go">${editing ? 'Save changes' : 'Add curator'}</button><div id="msg"></div></div>
 <script>
 var $=function(i){return document.getElementById(i)};
 function cropSquare(file,size){return new Promise(function(res,rej){
@@ -282,25 +287,27 @@ function cropSquare(file,size){return new Promise(function(res,rej){
   img.src=URL.createObjectURL(file);
 });}
 $('photo').addEventListener('change',async function(){
-  var f=$('photo').files[0];if(!f){$('preview').classList.remove('show');return;}
-  try{var b=await cropSquare(f,200);$('preview').src=URL.createObjectURL(b);$('preview').classList.add('show');}catch(e){$('preview').classList.remove('show');}
+  var f=$('photo').files[0];if(!f){return;}
+  try{var b=await cropSquare(f,200);$('preview').src=URL.createObjectURL(b);$('preview').classList.add('show');}catch(e){}
 });
 $('go').addEventListener('click',async function(){
   if(!$('name').value||!$('email').value){$('msg').textContent='Name and Access email required';return;}
   $('msg').textContent='Saving…';
   var fd=new FormData();
-  ['name','email','url'].forEach(function(f){fd.append(f,$(f).value);});
+  ['name','location','email','url'].forEach(function(f){fd.append(f,$(f).value);});
+  if($('cid')) fd.append('id',$('cid').value);
   var pf=$('photo').files[0];
   if(pf){ try{var blob=await cropSquare(pf,200);fd.append('photo',blob,'photo.jpg');}catch(e){fd.append('photo',pf);} }
   try{
     var r=await fetch('/admin/api/new-user',{method:'POST',credentials:'include',body:fd,redirect:'manual'});
     if(r.type==='opaqueredirect'||r.status===0){$('msg').textContent='Session expired — reload to sign in again.';return;}
     var d=await r.json();
-    $('msg').textContent = r.ok ? ('Added curator '+d.name+' (id '+d.id+')'+(d.note?' — '+d.note:'')) : (d.error||'Error '+r.status);
-    if(r.ok){ ['name','email','url'].forEach(function(f){$(f).value='';}); $('photo').value=''; $('preview').classList.remove('show'); }
+    if(r.ok){ $('msg').textContent=(d.updated?'Updated ':'Added ')+'curator '+d.name+' (id '+d.id+')'+(d.note?' — '+d.note:''); setTimeout(function(){location.href='/admin/curators';},900); }
+    else $('msg').textContent=(d.error||'Error '+r.status);
   }catch(e){ $('msg').textContent='Request failed: '+(e&&e.message?e.message:e); }
 });
 </script></body></html>`;
+}
 
 const LANDING_PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Bedtime Tunes · curator tools</title>
@@ -490,26 +497,43 @@ ${card(d.playsAll, 'plays all-time')}
 }
 
 function curatorsPage(rows) {
-  const trs = rows.map(r => `<tr>
+  const trs = rows.map(r => `<tr data-id="${r.id}">
 <td>${r.photo ? `<img src="https://audio.bedtimetunes.com/${r.photo}" width="40" height="40" style="border-radius:8px;object-fit:cover;display:block">` : '<span class="dim">—</span>'}</td>
 <td>${xml(r.name)}</td>
+<td class="dim">${xml(r.location || '')}</td>
 <td class="dim">${xml(r.email || '')}</td>
 <td>${r.url ? `<a href="${xml(r.url)}" target="_blank" rel="noopener" style="color:#e8739a">link ↗</a>` : ''}</td>
-<td class="r">${r.tracks}</td></tr>`).join('') || '<tr><td colspan="5" class="dim">No curators yet.</td></tr>';
+<td class="r">${r.tracks}</td>
+<td style="white-space:nowrap"><a class="act" href="/admin/new-user?id=${r.id}">edit</a> <button class="act danger" data-del="${r.id}">delete</button></td></tr>`).join('') || '<tr><td colspan="7" class="dim">No curators yet.</td></tr>';
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Curators · Bedtime Tunes</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500&family=Josefin+Sans:wght@200;300&display=swap" rel="stylesheet">
 <style>${FORM_CSS}
-.card{max-width:680px}
+.card{max-width:820px}
 table{width:100%;border-collapse:collapse;font-size:.85rem}
-th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:middle}
+th,td{text-align:left;padding:.5rem .55rem;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:middle}
 td.r,th.r{text-align:right}
 th{font-family:'Barlow';font-size:.55rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)}
-.dim{color:rgba(255,255,255,.4)}</style></head>
+.dim{color:rgba(255,255,255,.4)}
+.act{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7);border-radius:7px;font-size:.7rem;padding:.2rem .5rem;cursor:pointer;text-decoration:none}
+.act:hover{background:rgba(255,255,255,.12);color:#fff}
+.act.danger:hover{background:rgba(194,65,107,.3);border-color:rgba(194,65,107,.7)}</style></head>
 <body><div class="card"><a class="back top" href="/admin">← back to admin</a><h1>Curators</h1>
 <p class="hint">${rows.length} curator${rows.length === 1 ? '' : 's'}. Counts are tracks credited to each.</p>
-<table><thead><tr><th></th><th>Name</th><th>Access email</th><th>Link</th><th class="r">Tracks</th></tr></thead><tbody>${trs}</tbody></table>
-<a class="go" href="/admin/new-user" style="margin-top:1rem">＋ Add a curator</a></div></body></html>`;
+<table><thead><tr><th></th><th>Name</th><th>Location</th><th>Access email</th><th>Link</th><th class="r">Tracks</th><th></th></tr></thead><tbody>${trs}</tbody></table>
+<a class="go" href="/admin/new-user" style="margin-top:1rem">＋ Add a curator</a></div>
+<script>
+document.querySelectorAll('[data-del]').forEach(function(b){b.addEventListener('click',async function(){
+  var id=b.getAttribute('data-del');
+  if(!confirm('Delete this curator? Their tracks stay but lose the credit.'))return;
+  b.textContent='…';
+  var fd=new FormData();fd.append('id',id);
+  try{var r=await fetch('/admin/api/curator-delete',{method:'POST',credentials:'include',body:fd,redirect:'manual'});
+    if(r.type==='opaqueredirect'||r.status===0){alert('Session expired — reload to sign in again.');return;}
+    if(r.ok)location.reload();else alert('Error '+r.status);
+  }catch(e){alert('Request failed: '+e.message);}
+});});
+</script></body></html>`;
 }
 
 function usersPage(rows) {
@@ -586,7 +610,10 @@ export default {
     if (path === '/admin/new-user' && request.method === 'GET') {
       const bad = ownerOnly(request);
       if (bad) return new Response(bad, { status: 403 });
-      return new Response(NEW_USER_PAGE, { headers: { 'content-type': 'text/html;charset=utf-8' } });
+      const eid = parseInt(url.searchParams.get('id'), 10);
+      let c = null;
+      if (eid) c = await env.DB.prepare(`SELECT id, name, email, url, location, photo FROM uploaders WHERE id=?`).bind(eid).first();
+      return new Response(newUserPage(c), { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
     if (path === '/admin/api/new-user' && request.method === 'POST') {
@@ -595,23 +622,38 @@ export default {
       const form = await request.formData();
       const name = (form.get('name') || '').toString().trim();
       const cemail = (form.get('email') || '').toString().trim().toLowerCase();
+      const curl = (form.get('url') || '').toString().trim() || null;
+      const location = (form.get('location') || '').toString().trim() || null;
+      const editId = parseInt(form.get('id'), 10);
       if (!name || !cemail) return new Response(JSON.stringify({ error: 'Need a name and an Access email' }), { status: 400, headers: { ...cors(env), 'content-type': 'application/json' } });
-      const nid = (await env.DB.prepare(`SELECT COALESCE(MAX(id),5)+1 AS n FROM uploaders`).first()).n;
-      let photo = null, note = null;
+
+      // resolve which row we're writing: explicit edit id, else existing email, else new
+      let row = null;
+      if (editId) row = await env.DB.prepare(`SELECT id, photo FROM uploaders WHERE id=?`).bind(editId).first();
+      if (!row) row = await env.DB.prepare(`SELECT id, photo FROM uploaders WHERE lower(email)=?`).bind(cemail).first();
+      const id = row ? row.id : (await env.DB.prepare(`SELECT COALESCE(MAX(id),5)+1 AS n FROM uploaders`).first()).n;
+
+      let photo = row ? row.photo : null, note = null;
       const pf = form.get('photo');
       if (pf && pf.size) {
         if (!env.B2_KEY_ID || !env.B2_APP_KEY) {
-          note = 'Curator created, but the photo was skipped — uploads need B2_KEY_ID/B2_APP_KEY secrets on the Worker.';
+          note = 'Saved, but the photo was skipped — uploads need B2_KEY_ID/B2_APP_KEY secrets on the Worker.';
         } else {
           const ext = (pf.name.split('.').pop() || 'jpg').toLowerCase();
-          const r = await putB2(env, `u${nid}.${ext}`, await pf.arrayBuffer(), CT[ext] || 'image/jpeg');
-          if (r.ok) photo = `u${nid}.${ext}`;
-          else note = 'Curator created, but the photo upload to B2 failed.';
+          const r = await putB2(env, `u${id}.${ext}`, await pf.arrayBuffer(), CT[ext] || 'image/jpeg');
+          if (r.ok) photo = `u${id}.${ext}`;
+          else note = 'Saved, but the photo upload to B2 failed.';
         }
       }
-      await env.DB.prepare(`INSERT INTO uploaders (id, name, email, url, photo) VALUES (?,?,?,?,?)`)
-        .bind(nid, name, cemail, (form.get('url') || '').toString() || null, photo).run();
-      return Response.json({ id: nid, name, email: cemail, photo, note }, { headers: cors(env) });
+
+      if (row) {
+        await env.DB.prepare(`UPDATE uploaders SET name=?, email=?, url=?, location=?, photo=? WHERE id=?`)
+          .bind(name, cemail, curl, location, photo, id).run();
+      } else {
+        await env.DB.prepare(`INSERT INTO uploaders (id, name, email, url, location, photo) VALUES (?,?,?,?,?,?)`)
+          .bind(id, name, cemail, curl, location, photo).run();
+      }
+      return Response.json({ id, name, email: cemail, location, photo, note, updated: !!row }, { headers: cors(env) });
     }
 
     if (path === '/admin' && request.method === 'GET') {
@@ -621,11 +663,21 @@ export default {
       return new Response(adminPage(c ? c.n : 0), { headers: { 'content-type': 'text/html;charset=utf-8' } });
     }
 
+    if (path === '/admin/api/curator-delete' && request.method === 'POST') {
+      const bad = ownerOnly(request);
+      if (bad) return new Response(JSON.stringify({ error: bad }), { status: 403, headers: { ...cors(env), 'content-type': 'application/json' } });
+      const f = await request.formData();
+      const id = parseInt(f.get('id'), 10);
+      if (!id) return new Response(JSON.stringify({ error: 'missing id' }), { status: 400, headers: { ...cors(env), 'content-type': 'application/json' } });
+      await env.DB.prepare(`DELETE FROM uploaders WHERE id=?`).bind(id).run();   // tracks keep their uploader_id; the join just shows no credit
+      return Response.json({ ok: true }, { headers: cors(env) });
+    }
+
     if (path === '/admin/curators' && request.method === 'GET') {
       const bad = ownerOnly(request);
       if (bad) return new Response(bad, { status: 403 });
       const { results } = await env.DB.prepare(
-        `SELECT u.id, u.name, u.email, u.url, u.photo,
+        `SELECT u.id, u.name, u.email, u.url, u.photo, u.location,
                 (SELECT COUNT(*) FROM tunes t WHERE t.uploader_id = u.id) AS tracks
          FROM uploaders u ORDER BY u.id`).all();
       return new Response(curatorsPage(results || []), { headers: { 'content-type': 'text/html;charset=utf-8' } });
@@ -742,7 +794,7 @@ export default {
       const { results } = await env.DB.prepare(
         `SELECT t.id, t.title, t.artist, t.genre, t.description, t.historical, t.uploader_id,
                 t.mp3_key, t.youtube_id, t.spotify_id, t.art_key, t.art_url, t.duration_ms,
-                u.name AS uploader_name, u.url AS uploader_url, u.photo AS uploader_photo
+                u.name AS uploader_name, u.url AS uploader_url, u.photo AS uploader_photo, u.location AS uploader_location
            FROM tunes t LEFT JOIN uploaders u ON u.id = t.uploader_id
           ORDER BY t.id ASC`
       ).all();

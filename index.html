@@ -79,6 +79,7 @@
     .desc-wrap.open .desc-pop,.desc-wrap:hover .desc-pop{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
     .uploader a{color:rgba(255,255,255,.72);text-decoration:none;border-bottom:1px solid rgba(255,255,255,.22)}
     .uploader a:hover{color:#fff}
+    .up-loc{color:rgba(255,255,255,.32)}
     .up-photo{width:20px;height:20px;border-radius:50%;object-fit:cover;border:1px solid rgba(255,255,255,.2)}
     #splash{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.2rem;background:var(--deep);transition:opacity .7s}
     #splash img{width:min(220px,55vw);height:min(220px,55vw);object-fit:cover;border-radius:22px;box-shadow:0 0 90px rgba(192,65,107,.55),0 20px 60px rgba(0,0,0,.6);animation:float 8s ease-in-out infinite}
@@ -256,7 +257,7 @@
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
 // ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
-const VERSION='v3.0.17', BUILD_DATE='2026-06-11';
+const VERSION='v3.0.18', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
 function track(type,track_id,meta){
   try{
@@ -407,7 +408,8 @@ function cue(p, autoplay, forceSrc){
   if(t.uploader_name){
     const ph=t.uploader_photo?`<img class="up-photo" src="${AUDIO_BASE}/${t.uploader_photo}" alt=""/>`:'';
     const nm=t.uploader_url?`<a href="${esc(t.uploader_url)}" target="_blank" rel="noopener">${esc(t.uploader_name)}</a>`:esc(t.uploader_name);
-    up.innerHTML=`${ph}<span>added by ${nm}</span>`;
+    const loc=t.uploader_location?` <span class="up-loc">· ${esc(t.uploader_location)}</span>`:'';
+    up.innerHTML=`${ph}<span>added by ${nm}${loc}</span>`;
   } else up.innerHTML='';
   showSource(s);
   highlight();
