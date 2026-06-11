@@ -23,7 +23,12 @@ def http(url, data=None, headers=None):
     h = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
          **(headers or {})}
     req = urllib.request.Request(url, data=data, headers=h)
-    return json.loads(urllib.request.urlopen(req).read().decode())
+    try:
+        return json.loads(urllib.request.urlopen(req).read().decode())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        print(f"   HTTP {e.code} from {url}: {body[:200]}", file=sys.stderr)
+        raise
 
 def yt_search(query):
     # yt-dlp returns flat search results as JSON lines; take the first id
@@ -38,20 +43,30 @@ def yt_search(query):
         print(f"   yt-dlp error: {e}", file=sys.stderr); return None
 
 tracks = http(f"{args.base}/api/tracks")
+# verify yt-dlp is actually available — otherwise every track silently MISSes
+try:
+    v = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=20)
+    print(f"yt-dlp {v.stdout.strip()}", file=sys.stderr)
+except FileNotFoundError:
+    sys.exit("yt-dlp not found on PATH. Install it:  pip install yt-dlp   (then reopen the shell)")
 todo = [t for t in tracks if not t.get("mp3_key") and not t.get("youtube_id")][: args.limit]
 print(f"{len(todo)} tracks to resolve (cap {args.limit})", file=sys.stderr)
 
 updates = []
+found = 0
 for i, t in enumerate(todo, 1):
     vid = yt_search(f"{t['artist']} {t['title']}")
     print(f"  [{i}/{len(todo)}] id={t['id']} {t['artist']} – {t['title']} -> {vid or 'MISS'}", file=sys.stderr)
     if vid:
-        updates.append({"id": t["id"], "youtube_id": vid})
+        found += 1
+        updates.append({"id": int(t["id"]), "youtube_id": vid})
 
+print(f"resolved {found}/{len(todo)} (the rest had no YouTube hit)", file=sys.stderr)
 if updates:
     body = json.dumps(updates).encode()
     res = http(f"{args.base}/api/sync", data=body,
                headers={"Authorization": f"Bearer {args.token}", "Content-Type": "application/json"})
+    print(f"sync response: {res}", file=sys.stderr)
     print(f"synced: updated={res.get('updated')} missing={res.get('missing')}", file=sys.stderr)
 else:
-    print("nothing resolved", file=sys.stderr)
+    print("nothing resolved -> nothing sent (yt-dlp returned no video ids)", file=sys.stderr)
