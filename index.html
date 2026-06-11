@@ -11,12 +11,13 @@
   <meta property="og:title" content="Bedtime Tunes — tunes to snooze to" />
   <meta property="og:description" content="A curated bedtime playlist running since 2006." />
   <meta property="og:url" content="https://bedtimetunes.com/" />
-  <meta property="og:image" content="https://audio.bedtimetunes.com/og" />
+  <meta property="og:image" content="https://audio.bedtimetunes.com/og.png" />
+  <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Bedtime Tunes — tunes to snooze to" />
-  <meta name="twitter:image" content="https://audio.bedtimetunes.com/og" />
+  <meta name="twitter:image" content="https://audio.bedtimetunes.com/og.png" />
   <meta name="theme-color" content="#1a0a1e" />
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Josefin+Sans:wght@100;200;300&display=swap" rel="stylesheet" />
   <style>
@@ -255,7 +256,7 @@
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
 // ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
-const VERSION='v3.0.15', BUILD_DATE='2026-06-11';
+const VERSION='v3.0.16', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
 function track(type,track_id,meta){
   try{
@@ -462,6 +463,11 @@ $('share').addEventListener('click',async()=>{
   const t=tracks[order[pos]];
   const url=`${API_BASE}/s/${pathFor(t)}`;   // OG-enabled share link → redirects to the player
   track('share', t.id);
+  // native share sheet on mobile (Instagram/WhatsApp/Messages/"Add to Story" where supported)
+  if(navigator.share){
+    try{ await navigator.share({title:`${t.title} — ${t.artist}`, text:`${t.title} by ${t.artist} · Bedtime Tunes`, url}); return; }
+    catch(e){ if(e&&e.name==='AbortError') return; }   // user cancelled — don't fall through to copy
+  }
   try{ await navigator.clipboard.writeText(url); $('notice').textContent='link copied ✓'; setTimeout(()=>{if($('notice').textContent==='link copied ✓')$('notice').textContent='';},2000); }
   catch(e){ prompt('Copy this link:', url); }
 });

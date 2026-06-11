@@ -10,6 +10,33 @@
  *           CONTRIBUTORS (JSON {"email":uploaderId}), DEFAULT_UPLOADER
  * Secrets:  SYNC_TOKEN, B2_KEY_ID, B2_APP_KEY   (the last two only needed for /add uploads)
  */
+
+import { Resvg, initWasm } from '@resvg/resvg-wasm';
+
+// Lazy PNG rasterizer for OG cards. wasm + font are fetched at runtime (keeps the
+// Worker bundle small) and cached at the edge. Any failure → caller falls back to SVG.
+let _resvgReady = null, _fontBuf = null;
+async function ensureResvg() {
+  if (!_resvgReady) {
+    _resvgReady = (async () => {
+      const w = await fetch('https://cdn.jsdelivr.net/npm/@resvg/resvg-wasm@2.6.2/index_bg.wasm', { cf: { cacheEverything: true, cacheTtl: 604800 } });
+      await initWasm(await w.arrayBuffer());
+    })();
+  }
+  await _resvgReady;
+  if (!_fontBuf) {
+    try {
+      const f = await fetch('https://cdn.jsdelivr.net/fontsource/fonts/barlow@latest/latin-500-normal.ttf', { cf: { cacheEverything: true, cacheTtl: 604800 } });
+      if (f.ok) _fontBuf = new Uint8Array(await f.arrayBuffer());
+    } catch (e) {}
+  }
+}
+async function svgToPng(svg) {
+  await ensureResvg();
+  const opts = { fitTo: { mode: 'width', value: 1200 } };
+  if (_fontBuf) opts.font = { fontBuffers: [_fontBuf], loadSystemFonts: false, defaultFontFamily: 'Barlow' };
+  return new Resvg(svg, opts).render().asPng();
+}
 const cors = (env) => ({
   'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
@@ -140,6 +167,18 @@ ${logo ? `<image xlink:href="${logo}" x="500" y="120" width="200" height="200" c
 <text x="600" y="420" text-anchor="middle" font-family="Barlow, Arial, sans-serif" font-size="58" font-weight="700" letter-spacing="6" fill="#ffffff">BEDTIME TUNES</text>
 <text x="600" y="468" text-anchor="middle" font-family="Barlow, Arial, sans-serif" font-size="24" letter-spacing="10" fill="#ffffff" fill-opacity="0.55">TUNES TO SNOOZE TO</text>
 </svg>`;
+}
+
+// shared by /og (SVG) and /og.png (PNG) — builds the right card for an id (or default)
+async function buildOgSvg(env, id) {
+  if (id) {
+    const t = await env.DB.prepare(`SELECT id, title, artist, art_url, youtube_id FROM tunes WHERE id=?`).bind(id).first();
+    if (t) {
+      const art = t.art_url || (t.youtube_id ? `https://i.ytimg.com/vi/${t.youtube_id}/hqdefault.jpg` : 'https://bedtimetunes.com/bedtimetunes.jpg');
+      return await ogCard(t, art);
+    }
+  }
+  return await ogCardDefault();
 }
 
 const ADD_PAGE = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -722,7 +761,7 @@ export default {
       const player = `https://bedtimetunes.com/#${path.replace('/s/', '')}`;
       const title = xml(`${t.title} — ${t.artist}`);
       const desc = xml(t.description || 'A bedtime tune to snooze to.');
-      const ogimg = `https://audio.bedtimetunes.com/og/${t.id}`;
+      const ogimg = `https://audio.bedtimetunes.com/og.png/${t.id}`;
       const html = `<!doctype html><html><head><meta charset="utf-8">
 <title>${title} · Bedtime Tunes</title>
 <meta property="og:type" content="music.song">
@@ -730,6 +769,7 @@ export default {
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${desc}">
 <meta property="og:image" content="${ogimg}">
+<meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="${player}">
@@ -746,16 +786,20 @@ export default {
 
     if (path === '/og' || path.startsWith('/og/')) {
       const id = (path.match(/\/og\/(\d+)/) || [])[1];
-      if (id) {
-        const t = await env.DB.prepare(
-          `SELECT id, title, artist, art_url, youtube_id FROM tunes WHERE id=?`).bind(id).first();
-        if (t) {
-          const art = t.art_url
-            || (t.youtube_id ? `https://i.ytimg.com/vi/${t.youtube_id}/hqdefault.jpg` : 'https://bedtimetunes.com/bedtimetunes.jpg');
-          return new Response(await ogCard(t, art), { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
-        }
+      const svg = await buildOgSvg(env, id);
+      return new Response(svg, { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
+    }
+
+    if (path === '/og.png' || path.startsWith('/og.png/')) {
+      const id = (path.match(/\/og\.png\/(\d+)/) || [])[1];
+      const svg = await buildOgSvg(env, id);
+      try {
+        const png = await svgToPng(svg);
+        return new Response(png, { headers: { 'content-type': 'image/png', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
+      } catch (e) {
+        // rasterizer unavailable → serve the SVG so the card still renders where SVG is accepted
+        return new Response(svg, { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=300', 'X-OG-Fallback': 'svg', ...cors(env) } });
       }
-      return new Response(await ogCardDefault(), { headers: { 'content-type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'public, max-age=86400', ...cors(env) } });
     }
 
     // B2 media proxy — audio AND images, hotlink-gated + edge-cached
