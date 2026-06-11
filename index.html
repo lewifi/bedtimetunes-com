@@ -58,6 +58,14 @@
     #splash img{width:min(220px,55vw);height:min(220px,55vw);object-fit:cover;border-radius:22px;box-shadow:0 0 90px rgba(192,65,107,.55),0 20px 60px rgba(0,0,0,.6);animation:float 8s ease-in-out infinite}
     #splash.gone{opacity:0;pointer-events:none}
     .splash-sub{font-family:'Barlow',sans-serif;font-size:.55rem;letter-spacing:.34em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+    .modal{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:rgba(8,3,10,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+    .modal-card{position:relative;width:100%;max-width:400px;background:rgba(26,10,30,.92);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:1.8rem;display:flex;flex-direction:column;gap:.9rem;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+    .modal-card h2{font-family:'Barlow',sans-serif;font-weight:500;letter-spacing:.18em;text-transform:uppercase;font-size:.95rem}
+    .modal-card p{font-size:.85rem;line-height:1.5;color:rgba(255,255,255,.7)}
+    .modal-x{position:absolute;top:.7rem;right:.9rem;background:none;border:none;color:rgba(255,255,255,.5);font-size:1.4rem;cursor:pointer;line-height:1}
+    .modal-x:hover{color:#fff}
+    .modal-apply{display:inline-block;text-align:center;margin-top:.4rem;background:linear-gradient(135deg,#c2416b,#7b2650);color:#fff;border-radius:100px;padding:.7rem;font-family:'Barlow',sans-serif;letter-spacing:.18em;text-transform:uppercase;font-size:.6rem;text-decoration:none}
+    .modal-apply:hover{box-shadow:0 0 30px rgba(194,65,107,.6)}
 
     .progress{width:100%;max-width:480px;display:flex;flex-direction:column;gap:.35rem}
     #bar{width:100%;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:rgba(255,255,255,.12);cursor:pointer;outline:none}
@@ -109,14 +117,18 @@
     .logo-tip:hover .tip{opacity:1}
 
     @media(max-width:820px){
-      html,body{overflow:hidden}
-      #app{flex-direction:column;height:100vh;gap:.6rem;padding:.6rem}
-      #stage{flex:none;flex-shrink:0;max-height:56vh;overflow:hidden;padding:.6rem;gap:.7rem;position:sticky;top:0}
-      .now{gap:.6rem}
-      #art-wrap{width:min(150px,38vw);height:min(150px,38vw)}
-      #yt-wrap{max-width:100%;max-height:34vh}
+      html,body{overflow-y:auto;overflow-x:hidden;height:auto}
+      #app{flex-direction:column;height:auto;min-height:100vh;gap:0;padding:.6rem}
+      /* header + art + meta + controls stay pinned; playlist scrolls underneath */
+      #stage{position:sticky;top:0;z-index:20;flex:none;padding:.7rem .7rem 1rem;gap:.55rem;
+             background:rgba(13,5,16,.78);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+             border-radius:0 0 18px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
+      .now{gap:.55rem}
+      #art-wrap{width:min(116px,28vw);height:min(116px,28vw)}
+      #yt-wrap{max-width:100%;max-height:30vh}
       .now.wide{max-width:100%}
-      #sidebar{flex:1;min-width:0;max-width:none;min-height:0;height:auto}
+      #sidebar{flex:none;min-width:0;max-width:none;background:transparent;border:none;backdrop-filter:none;border-radius:0;margin-top:.5rem}
+      #list{overflow:visible}
     }
   </style>
 </head>
@@ -175,8 +187,19 @@
     </div>
     <div id="list"></div>
     <div class="foot">made by <a href="https://lewi.fi" target="_blank" rel="noopener">lewi.fi</a> &middot;
-      <a id="sp-playlist" href="#" target="_blank" rel="noopener">open in spotify ↗</a>
+      <a id="sp-playlist" href="#" target="_blank" rel="noopener">open in spotify ↗</a> &middot;
+      <a id="curator-link" href="#">become a curator</a>
       <span id="ver" class="ver"></span></div>
+  </div>
+</div>
+
+<div id="curator-modal" class="modal hidden">
+  <div class="modal-card">
+    <button id="curator-close" class="modal-x" aria-label="Close">&times;</button>
+    <h2>Become a curator</h2>
+    <p>Bedtime Tunes is curated by a small circle of friends. Want to add your own late-night tunes to the collection?</p>
+    <p>Email us with one song you'd love to add — paste a YouTube link, or attach an MP3.</p>
+    <a id="curator-apply" class="modal-apply" href="#">Apply by email ✉</a>
   </div>
 </div>
 
@@ -185,11 +208,22 @@
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
 // ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
-const VERSION='v3.0.5', BUILD_DATE='2026-06-11';
+const VERSION='v3.0.6', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
 const SPOTIFY_PLAYLIST_URL='https://open.spotify.com/playlist/6AGKG8W0y4xezu8Cl6Rtkj';
 document.getElementById('sp-playlist').href=SPOTIFY_PLAYLIST_URL;
 document.getElementById('ver').textContent=VERSION;
+// curator modal + prefilled application email
+(function(){
+  const m=document.getElementById('curator-modal');
+  const subj="I want to apply to become a Bedtime Tunes curator";
+  const body="Give one example of a song you'd like to add: (paste a YouTube link) — or attach an MP3 to this email.";
+  document.getElementById('curator-apply').href=
+    `mailto:contact@bedtimetunes.com?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
+  document.getElementById('curator-link').addEventListener('click',e=>{e.preventDefault();m.classList.remove('hidden');});
+  document.getElementById('curator-close').addEventListener('click',()=>m.classList.add('hidden'));
+  m.addEventListener('click',e=>{ if(e.target===m) m.classList.add('hidden'); });
+})();
 </script>
 <script>
 /* aurora + stars + particles (same shell) */
