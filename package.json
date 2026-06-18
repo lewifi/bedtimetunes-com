@@ -1,9 +1,0 @@
-{
-  "name": "bedtimetunes-audio",
-  "private": true,
-  "type": "module",
-  "main": "src/index.js",
-  "dependencies": {
-    "@resvg/resvg-wasm": "2.6.2"
-  }
-}
