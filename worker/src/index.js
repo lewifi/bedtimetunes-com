@@ -230,11 +230,12 @@ $('go').addEventListener('click',async function(){
   if($('image').files[0]) fd.append('image',$('image').files[0]);
   if($('notify').checked) fd.append('notify','1');
   try{
-    var r=await fetch('/api/add',{method:'POST',credentials:'include',body:fd});
-    var d=await r.json();
-    $('msg').textContent = r.ok ? ('Added as id '+d.id+' (by '+d.by+')') : (d.error||'Error '+r.status);
-    if(r.ok){ TEXT.forEach(function(f){$(f).value='';}); $('mp3').value=''; $('image').value=''; }
-  }catch(e){ $('msg').textContent='Network error'; }
+    var r=await fetch('/api/add',{method:'POST',credentials:'include',body:fd,redirect:'manual'});
+    if(r.type==='opaqueredirect'||r.status===0){ $('msg').textContent='Your session expired — reload this page to sign in again.'; return; }
+    var t=await r.text(),d={};try{d=JSON.parse(t)}catch(e){}
+    if(r.ok){ $('msg').textContent='Added as id '+d.id+' (by '+d.by+')'+(d.notified?' · subscribers emailed':''); TEXT.forEach(function(f){$(f).value='';}); $('mp3').value=''; $('image').value=''; }
+    else $('msg').textContent=(d.error||('Error '+r.status+(t?' — '+t.slice(0,100):'')));
+  }catch(e){ $('msg').textContent='Request failed: '+(e&&e.message?e.message:e); }
 });
 </script></body></html>`;
 
