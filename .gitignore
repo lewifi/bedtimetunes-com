@@ -32,3 +32,7 @@ Thumbs.db
 
 Select-String -Path .gitignore -Pattern "node_modules"   # any output = already there
 Add-Content .gitignore "`nnode_modules/"                  # run only if the line above showed nothing
+
+.dev.vars*
+!.dev.vars.example
+!.env.example
