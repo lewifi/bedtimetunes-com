@@ -797,9 +797,9 @@ export default {
                 t.mp3_key, t.youtube_id, t.spotify_id, t.art_key, t.art_url, t.duration_ms,
                 u.name AS uploader_name, u.url AS uploader_url, u.photo AS uploader_photo, u.location AS uploader_location
            FROM tunes t LEFT JOIN uploaders u ON u.id = t.uploader_id
-          ORDER BY t.id ASC`
+          ORDER BY t.id DESC`
       ).all();
-      return Response.json(results, { headers: { ...cors(env), 'Cache-Control': 'public, max-age=60' } });
+      return Response.json(results, { headers: { ...cors(env), 'Cache-Control': 'public, max-age=30' } });
     }
 
     if (path === '/api/sync' && request.method === 'POST') {

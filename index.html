@@ -232,7 +232,7 @@
   <!-- RIGHT -->
   <div id="sidebar">
     <div class="side-head">
-      <div class="side-title"><span id="count">tunes</span><span class="toggles"><button id="reverse" class="tgl" title="Reverse order">Reverse</button><button id="shuffle" class="tgl" title="Shuffle">Shuffle</button></span></div>
+      <div class="side-title"><span id="count">tunes</span><span class="toggles"><button id="reverse" class="tgl" title="Sort newest / oldest">Oldest first</button><button id="shuffle" class="tgl" title="Shuffle">Shuffle</button></span></div>
       <div id="estimate" class="estimate"></div>
       <input id="search" placeholder="Search title or artist…" />
     </div>
@@ -270,7 +270,7 @@
 <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
 <script>
 // ── CONFIG ──  ⚑ bump VERSION on every push (e.g. 3.0.3 → 3.0.4)
-const VERSION='v3.0.19', BUILD_DATE='2026-06-11';
+const VERSION='v3.0.20', BUILD_DATE='2026-06-11';
 const AUDIO_BASE='https://audio.bedtimetunes.com', API_BASE='https://audio.bedtimetunes.com';
 function track(type,track_id,meta){
   try{
@@ -450,10 +450,11 @@ function cue(p, autoplay, forceSrc){
     audio.src=`${AUDIO_BASE}/${t.mp3_key}`;
     if(autoplay) audio.play().catch(()=>{});
   } else if(s==='youtube'){
-    if(ytReady) ytPlayer.loadVideoById(t.youtube_id);
-    else setTimeout(()=>ytReady&&ytPlayer.loadVideoById(t.youtube_id),600);
+    const fn = autoplay ? 'loadVideoById' : 'cueVideoById';   // cue = load without autoplay
+    if(ytReady) ytPlayer[fn](t.youtube_id);
+    else setTimeout(()=>ytReady&&ytPlayer[fn](t.youtube_id),600);
   } else if(s==='spotify'){
-    const load=()=>{ spCtrl.loadUri('spotify:track:'+t.spotify_id); spCtrl.play(); };
+    const load=()=>{ spCtrl.loadUri('spotify:track:'+t.spotify_id); if(autoplay) spCtrl.play(); };
     if(spReady) load(); else setTimeout(()=>spReady&&load(),600);
   }
 }
@@ -504,8 +505,14 @@ $('shuffle').addEventListener('click',()=>{
   applyOrder(o);
 });
 $('reverse').addEventListener('click',()=>{
-  reverseOn=!reverseOn; $('reverse').classList.toggle('on',reverseOn);
-  applyOrder(order.slice().reverse());   // flips whatever's showing (sorted or shuffled), no re-randomize
+  reverseOn=!reverseOn;
+  $('reverse').textContent = reverseOn ? 'Newest first' : 'Oldest first';
+  $('reverse').classList.toggle('on',reverseOn);
+  order=order.slice().reverse();      // flip whatever's showing (sorted or shuffled)
+  pos=0;
+  renderList($('search').value);
+  cue(0,false);                       // select the song now at the top, don't autoplay
+  $('list').scrollTop=0;              // keep the list scrolled to the top
 });
 
 // list + search
