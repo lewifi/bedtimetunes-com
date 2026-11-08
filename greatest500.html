@@ -716,10 +716,10 @@ function skip(dir) {
 }
 
 function filterList(query) {
-  const q = query.trim().toLowerCase();
-  filtered = q ? SONGS.filter(function(s) {
-    return s.t.toLowerCase().includes(q) || s.a.toLowerCase().includes(q);
-  }) : SONGS.slice();
+  const raw = query.trim();
+  let re = null;
+  if (raw) { try { re = new RegExp(raw, 'i'); } catch(e) { re = new RegExp(raw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i'); } }
+  filtered = re ? SONGS.filter(function(s) { return re.test(s.t) || re.test(s.a); }) : SONGS.slice();
   renderList();
   document.getElementById('count-label').textContent = filtered.length + ' of 500';
   if (currentIdx >= filtered.length) currentIdx = -1;
