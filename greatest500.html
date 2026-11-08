@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>not bedtime — Rolling Stone's 500 Greatest Songs of All Time</title>
+  <meta name="description" content="All 500 of Rolling Stone's Greatest Songs of All Time, playable via YouTube and Spotify. The ultimate party playlist." />
+  <link rel="icon" type="image/png" href="/BT.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Bedtime Tunes" />
+  <meta property="og:title" content="not bedtime — Rolling Stone's 500 Greatest Songs" />
+  <meta property="og:description" content="All 500 of Rolling Stone's Greatest Songs, playable on YouTube and Spotify." />
+  <meta property="og:url" content="https://bedtimetunes.com/greatest500" />
+  <meta property="og:image" content="https://audio.bedtimetunes.com/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;
+      --gold:#e8a020;--red:#e03030;--orange:#e05020;
+      --text:#fff;--dim:rgba(255,255,255,.45);--dimmer:rgba(255,255,255,.25);
+    }
+    html,body{height:100%;font-family:'Barlow',sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+
+    /* ── HEADER ── */
+    #header{position:fixed;top:0;left:0;right:0;z-index:50;height:56px;background:rgba(10,10,10,.96);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;padding:0 1rem;gap:1rem;backdrop-filter:blur(10px)}
+    .logo-link{text-decoration:none;color:inherit;display:flex;align-items:center;gap:.5rem;flex-shrink:0}
+    .logo-link img{width:28px;height:28px;border-radius:6px;object-fit:cover}
+    #header h1{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.05rem;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #header h1 span{color:var(--gold)}
+    .src-tabs{display:flex;gap:.3rem;margin-left:auto;flex-shrink:0}
+    .src-tab{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:var(--dim);border-radius:100px;font-family:'Barlow',sans-serif;font-size:.6rem;letter-spacing:.18em;text-transform:uppercase;padding:.3rem .9rem;cursor:pointer;transition:all .18s}
+    .src-tab:hover{background:rgba(255,255,255,.1);color:#fff}
+    .src-tab.active{background:var(--gold);border-color:var(--gold);color:#000;font-weight:600}
+    .src-tab.sp.active{background:#1DB954;border-color:#1DB954;color:#000}
+
+    /* ── LAYOUT ── */
+    #app{display:flex;height:100vh;padding-top:56px}
+    #player-col{width:min(55%,680px);flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,.07)}
+    #list-col{flex:1;min-width:0;display:flex;flex-direction:column}
+
+    /* ── PLAYER ── */
+    #player-wrap{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg)}
+    #yt-wrap{flex:1;min-height:0;background:#000;position:relative}
+    #yt-frame{width:100%;height:100%;border:none;display:block}
+    #sp-wrap{flex:1;min-height:0;display:flex;flex-direction:column;padding:.75rem}
+    #sp-frame{flex:1;min-height:0;border:none;border-radius:12px;min-height:160px}
+    .hidden{display:none!important}
+
+    /* ── NOW PLAYING BAR ── */
+    #nowbar{padding:.6rem 1rem;border-top:1px solid rgba(255,255,255,.07);background:var(--bg2);display:flex;align-items:center;gap:.7rem;min-height:60px}
+    #now-rank{font-family:'Barlow Condensed',sans-serif;font-size:1.3rem;font-weight:700;color:var(--gold);min-width:2rem;text-align:right}
+    #now-info{flex:1;min-width:0}
+    #now-title{font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #now-artist{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #now-year{font-size:.6rem;color:var(--dimmer);margin-left:.3rem}
+    .nav-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--dim);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1rem;transition:all .15s;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .nav-btn:hover{background:rgba(255,255,255,.14);color:#fff}
+    #yt-open{background:rgba(232,160,32,.1);border:1px solid rgba(232,160,32,.35);color:var(--gold);border-radius:100px;font-family:'Barlow',sans-serif;font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;padding:.3rem .75rem;cursor:pointer;text-decoration:none;white-space:nowrap;transition:all .18s;flex-shrink:0}
+    #yt-open:hover{background:rgba(232,160,32,.22);color:#fff}
+
+    /* ── SEARCH ── */
+    #search-wrap{padding:.5rem .75rem;border-bottom:1px solid rgba(255,255,255,.07);background:var(--bg2)}
+    #search{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#fff;font-family:'Barlow',sans-serif;font-size:.85rem;padding:.45rem .75rem;outline:none;transition:border-color .15s}
+    #search:focus{border-color:rgba(232,160,32,.5)}
+    #search::placeholder{color:var(--dimmer)}
+
+    /* ── SONG LIST ── */
+    #list{flex:1;overflow-y:auto;overflow-x:hidden}
+    #list::-webkit-scrollbar{width:4px}
+    #list::-webkit-scrollbar-track{background:transparent}
+    #list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+    .song-row{display:flex;align-items:center;gap:.6rem;padding:.42rem .75rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s;user-select:none}
+    .song-row:hover{background:rgba(255,255,255,.05)}
+    .song-row.playing{background:rgba(232,160,32,.1)}
+    .song-row.playing .s-rank{color:var(--gold)}
+    .song-row.playing .s-title{color:var(--gold)}
+    .s-rank{font-family:'Barlow Condensed',sans-serif;font-size:.8rem;font-weight:600;color:var(--dimmer);min-width:2.1rem;text-align:right;flex-shrink:0}
+    .s-title{font-size:.82rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+    .s-artist{font-size:.68rem;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38%;flex-shrink:0;text-align:right}
+    .s-year{font-size:.6rem;color:var(--dimmer);flex-shrink:0;min-width:2.5rem;text-align:right}
+
+    /* ── FOOTER ── */
+    #list-footer{padding:.45rem .75rem;border-top:1px solid rgba(255,255,255,.06);background:var(--bg2);font-size:.6rem;color:var(--dimmer);display:flex;align-items:center;gap:.5rem;justify-content:space-between}
+    #list-footer a{color:rgba(232,160,32,.75);text-decoration:none}
+    #list-footer a:hover{color:var(--gold)}
+
+    /* ── MOBILE ── */
+    @media(max-width:680px){
+      html,body{overflow:auto}
+      #app{flex-direction:column;height:auto;overflow:visible}
+      #player-col{width:100%;border-right:none;border-bottom:1px solid rgba(255,255,255,.07)}
+      #yt-wrap{height:56vw;min-height:200px;flex:none}
+      #sp-wrap{height:280px;flex:none}
+      #list-col{height:60vh;min-height:300px}
+      #list{flex:1;overflow-y:auto}
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <a class="logo-link" href="https://bedtimetunes.com">
+    <img src="/BT.png" alt="BT" />
+  </a>
+  <h1>not bedtime &mdash; <span>Rolling Stone's 500 Greatest Songs</span></h1>
+  <div class="src-tabs">
+    <button class="src-tab active" id="tab-yt" onclick="setSource('yt')">YouTube</button>
+    <button class="src-tab sp" id="tab-sp" onclick="setSource('sp')">Spotify</button>
+  </div>
+</div>
+
+<div id="app">
+  <!-- Player column -->
+  <div id="player-col">
+    <div id="player-wrap">
+      <div id="yt-wrap">
+        <iframe id="yt-frame" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+      </div>
+      <div id="sp-wrap" class="hidden">
+        <iframe id="sp-frame"
+          src="https://open.spotify.com/embed/playlist/1pr6ve5uzRkHhtnUuHI0UJ?utm_source=generator&theme=0"
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy"></iframe>
+      </div>
+    </div>
+    <div id="nowbar">
+      <div id="now-rank">—</div>
+      <div id="now-info">
+        <div id="now-title">Select a song to play</div>
+        <div id="now-artist"></div>
+      </div>
+      <a id="yt-open" target="_blank" rel="noopener" style="display:none">Open in YouTube ↗</a>
+      <button class="nav-btn" onclick="skip(-1)" title="Previous">◀</button>
+      <button class="nav-btn" onclick="skip(1)" title="Next">▶</button>
+    </div>
+  </div>
+
+  <!-- List column -->
+  <div id="list-col">
+    <div id="search-wrap">
+      <input id="search" type="search" placeholder="Search the 500…" oninput="filterList(this.value)" autocomplete="off" />
+    </div>
+    <div id="list"></div>
+    <div id="list-footer">
+      <span>Rolling Stone's <a href="https://www.rollingstone.com/music/music-lists/best-songs-of-all-time-1224767/" target="_blank" rel="noopener">500 Greatest Songs of All Time</a> (2021)</span>
+      <span id="count-label">500 songs</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────────
+// Rolling Stone's 500 Greatest Songs of All Time (2021 edition)
+const SONGS = [
+  {r:1,  t:"Respect",                              a:"Aretha Franklin",                       y:1967},
+  {r:2,  t:"Fight the Power",                      a:"Public Enemy",                          y:1989},
+  {r:3,  t:"A Change Is Gonna Come",               a:"Sam Cooke",                             y:1964},
+  {r:4,  t:"Like a Rolling Stone",                 a:"Bob Dylan",                             y:1965},
+  {r:5,  t:"Johnny B. Goode",                      a:"Chuck Berry",                           y:1958},
+  {r:6,  t:"Good Vibrations",                      a:"The Beach Boys",                        y:1966},
+  {r:7,  t:"Smells Like Teen Spirit",              a:"Nirvana",                               y:1991},
+  {r:8,  t:"What's Going On",                      a:"Marvin Gaye",                           y:1971},
+  {r:9,  t:"Superstition",                         a:"Stevie Wonder",                         y:1972},
+  {r:10, t:"Born to Run",                          a:"Bruce Springsteen",                     y:1975},
+  {r:11, t:"I Want to Hold Your Hand",             a:"The Beatles",                           y:1963},
+  {r:12, t:"Purple Rain",                          a:"Prince",                                y:1984},
+  {r:13, t:"Maybellene",                           a:"Chuck Berry",                           y:1955},
+  {r:14, t:"Hound Dog",                            a:"Elvis Presley",                         y:1956},
+  {r:15, t:"Yesterday",                            a:"The Beatles",                           y:1965},
+  {r:16, t:"Papa's Got a Brand New Bag",           a:"James Brown",                           y:1965},
+  {r:17, t:"God Only Knows",                       a:"The Beach Boys",                        y:1966},
+  {r:18, t:"Imagine",                              a:"John Lennon",                           y:1971},
+  {r:19, t:"Eleanor Rigby",                        a:"The Beatles",                           y:1966},
+  {r:20, t:"Tumbling Dice",                        a:"The Rolling Stones",                    y:1972},
+  {r:21, t:"I'll Take You There",                  a:"The Staple Singers",                    y:1972},
+  {r:22, t:"Strawberry Fields Forever",            a:"The Beatles",                           y:1967},
+  {r:23, t:"Stand By Me",                          a:"Ben E. King",                           y:1961},
+  {r:24, t:"The Weight",                           a:"The Band",                              y:1968},
+  {r:25, t:"When Doves Cry",                       a:"Prince",                                y:1984},
+  {r:26, t:"Roxanne",                              a:"The Police",                            y:1978},
+  {r:27, t:"The Message",                          a:"Grandmaster Flash and the Furious Five", y:1982},
+  {r:28, t:"Hotel California",                     a:"Eagles",                                y:1977},
+  {r:29, t:"Redemption Song",                      a:"Bob Marley & The Wailers",              y:1980},
+  {r:30, t:"Billie Jean",                          a:"Michael Jackson",                       y:1982},
+  {r:31, t:"I Got You (I Feel Good)",              a:"James Brown",                           y:1965},
+  {r:32, t:"What'd I Say",                         a:"Ray Charles",                           y:1959},
+  {r:33, t:"Sympathy for the Devil",               a:"The Rolling Stones",                    y:1968},
+  {r:34, t:"River Deep, Mountain High",            a:"Ike & Tina Turner",                     y:1966},
+  {r:35, t:"Here Comes the Sun",                   a:"The Beatles",                           y:1969},
+  {r:36, t:"Gimme Shelter",                        a:"The Rolling Stones",                    y:1969},
+  {r:37, t:"Mystery Train",                        a:"Elvis Presley",                         y:1955},
+  {r:38, t:"Tutti Frutti",                         a:"Little Richard",                        y:1955},
+  {r:39, t:"I Heard It Through the Grapevine",     a:"Marvin Gaye",                           y:1968},
+  {r:40, t:"I Am the Walrus",                      a:"The Beatles",                           y:1967},
+  {r:41, t:"Walk This Way",                        a:"Aerosmith",                             y:1975},
+  {r:42, t:"Light My Fire",                        a:"The Doors",                             y:1967},
+  {r:43, t:"Be My Baby",                           a:"The Ronettes",                          y:1963},
+  {r:44, t:"Up on the Roof",                       a:"The Drifters",                          y:1962},
+  {r:45, t:"Brown Sugar",                          a:"The Rolling Stones",                    y:1971},
+  {r:46, t:"That's All Right",                     a:"Elvis Presley",                         y:1954},
+  {r:47, t:"(I Can't Get No) Satisfaction",        a:"The Rolling Stones",                    y:1965},
+  {r:48, t:"Good Times",                           a:"Chic",                                  y:1979},
+  {r:49, t:"Rapper's Delight",                     a:"The Sugarhill Gang",                    y:1979},
+  {r:50, t:"No Scrubs",                            a:"TLC",                                   y:1999},
+  {r:51, t:"All Along the Watchtower",             a:"Jimi Hendrix Experience",               y:1968},
+  {r:52, t:"Bohemian Rhapsody",                    a:"Queen",                                 y:1975},
+  {r:53, t:"Hey Jude",                             a:"The Beatles",                           y:1968},
+  {r:54, t:"Stairway to Heaven",                   a:"Led Zeppelin",                          y:1971},
+  {r:55, t:"A Day in the Life",                    a:"The Beatles",                           y:1967},
+  {r:56, t:"Whole Lotta Love",                     a:"Led Zeppelin",                          y:1969},
+  {r:57, t:"(What's So Funny 'Bout) Peace, Love and Understanding", a:"Elvis Costello & The Attractions", y:1979},
+  {r:58, t:"Comfortably Numb",                     a:"Pink Floyd",                            y:1979},
+  {r:59, t:"Heroes",                               a:"David Bowie",                           y:1977},
+  {r:60, t:"Tangled Up in Blue",                   a:"Bob Dylan",                             y:1975},
+  {r:61, t:"In My Life",                           a:"The Beatles",                           y:1965},
+  {r:62, t:"Purple Haze",                          a:"Jimi Hendrix Experience",               y:1967},
+  {r:63, t:"Blowin' in the Wind",                  a:"Bob Dylan",                             y:1963},
+  {r:64, t:"Mr. Tambourine Man",                   a:"Bob Dylan",                             y:1965},
+  {r:65, t:"The Times They Are A-Changin'",        a:"Bob Dylan",                             y:1964},
+  {r:66, t:"My Generation",                        a:"The Who",                               y:1965},
+  {r:67, t:"Won't Get Fooled Again",               a:"The Who",                               y:1971},
+  {r:68, t:"Baba O'Riley",                         a:"The Who",                               y:1971},
+  {r:69, t:"Space Oddity",                         a:"David Bowie",                           y:1969},
+  {r:70, t:"Little Wing",                          a:"Jimi Hendrix Experience",               y:1967},
+  {r:71, t:"Voodoo Child (Slight Return)",         a:"Jimi Hendrix Experience",               y:1968},
+  {r:72, t:"Black Dog",                            a:"Led Zeppelin",                          y:1971},
+  {r:73, t:"Kashmir",                              a:"Led Zeppelin",                          y:1975},
+  {r:74, t:"When the Levee Breaks",                a:"Led Zeppelin",                          y:1971},
+  {r:75, t:"Wish You Were Here",                   a:"Pink Floyd",                            y:1975},
+  {r:76, t:"Money",                                a:"Pink Floyd",                            y:1973},
+  {r:77, t:"Ziggy Stardust",                       a:"David Bowie",                           y:1972},
+  {r:78, t:"Changes",                              a:"David Bowie",                           y:1972},
+  {r:79, t:"My Girl",                              a:"The Temptations",                       y:1964},
+  {r:80, t:"Ain't Too Proud to Beg",               a:"The Temptations",                       y:1966},
+  {r:81, t:"Papa Was a Rollin' Stone",             a:"The Temptations",                       y:1972},
+  {r:82, t:"I Can't Help Myself",                  a:"Four Tops",                             y:1965},
+  {r:83, t:"Reach Out I'll Be There",              a:"Four Tops",                             y:1966},
+  {r:84, t:"Dancing in the Street",                a:"Martha Reeves & the Vandellas",         y:1964},
+  {r:85, t:"Jolene",                               a:"Dolly Parton",                          y:1973},
+  {r:86, t:"Ring of Fire",                         a:"Johnny Cash",                           y:1963},
+  {r:87, t:"Folsom Prison Blues",                  a:"Johnny Cash",                           y:1955},
+  {r:88, t:"I Walk the Line",                      a:"Johnny Cash",                           y:1956},
+  {r:89, t:"Juicy",                                a:"The Notorious B.I.G.",                  y:1994},
+  {r:90, t:"N.Y. State of Mind",                   a:"Nas",                                   y:1994},
+  {r:91, t:"Paid in Full",                         a:"Eric B. & Rakim",                       y:1987},
+  {r:92, t:"Straight Outta Compton",               a:"N.W.A",                                 y:1988},
+  {r:93, t:"Planet Rock",                          a:"Afrika Bambaataa & the Soulsonic Force", y:1982},
+  {r:94, t:"White Lines (Don't Don't Do It)",      a:"Grandmaster Flash & Melle Mel",         y:1983},
+  {r:95, t:"Walk This Way",                        a:"Run-DMC feat. Aerosmith",               y:1986},
+  {r:96, t:"It Takes a Nation of Millions",        a:"Public Enemy",                          y:1988},
+  {r:97, t:"Brown Eyed Girl",                      a:"Van Morrison",                          y:1967},
+  {r:98, t:"Moondance",                            a:"Van Morrison",                          y:1970},
+  {r:99, t:"Into the Mystic",                      a:"Van Morrison",                          y:1970},
+  {r:100,t:"Riders on the Storm",                  a:"The Doors",                             y:1971},
+  {r:101,t:"Break on Through (To the Other Side)", a:"The Doors",                             y:1967},
+  {r:102,t:"People Are Strange",                   a:"The Doors",                             y:1967},
+  {r:103,t:"Born to Be Wild",                      a:"Steppenwolf",                           y:1968},
+  {r:104,t:"Jailhouse Rock",                       a:"Elvis Presley",                         y:1957},
+  {r:105,t:"Heartbreak Hotel",                     a:"Elvis Presley",                         y:1956},
+  {r:106,t:"Suspicious Minds",                     a:"Elvis Presley",                         y:1969},
+  {r:107,t:"Blue Suede Shoes",                     a:"Carl Perkins",                          y:1956},
+  {r:108,t:"Chain of Fools",                       a:"Aretha Franklin",                       y:1967},
+  {r:109,t:"Think",                                a:"Aretha Franklin",                       y:1968},
+  {r:110,t:"(You Make Me Feel Like) A Natural Woman",a:"Aretha Franklin",                     y:1967},
+  {r:111,t:"I Never Loved a Man the Way I Love You",a:"Aretha Franklin",                      y:1967},
+  {r:112,t:"Do Right Woman, Do Right Man",         a:"Aretha Franklin",                       y:1967},
+  {r:113,t:"ABC",                                  a:"Jackson 5",                             y:1970},
+  {r:114,t:"I Want You Back",                      a:"Jackson 5",                             y:1969},
+  {r:115,t:"I'll Be There",                        a:"Jackson 5",                             y:1970},
+  {r:116,t:"Never Can Say Goodbye",                a:"Jackson 5",                             y:1971},
+  {r:117,t:"Thriller",                             a:"Michael Jackson",                       y:1982},
+  {r:118,t:"Beat It",                              a:"Michael Jackson",                       y:1982},
+  {r:119,t:"Man in the Mirror",                    a:"Michael Jackson",                       y:1988},
+  {r:120,t:"You Are the Sunshine of My Life",      a:"Stevie Wonder",                         y:1972},
+  {r:121,t:"Sir Duke",                             a:"Stevie Wonder",                         y:1976},
+  {r:122,t:"Higher Ground",                        a:"Stevie Wonder",                         y:1973},
+  {r:123,t:"Living for the City",                  a:"Stevie Wonder",                         y:1974},
+  {r:124,t:"Signed, Sealed, Delivered I'm Yours",  a:"Stevie Wonder",                         y:1970},
+  {r:125,t:"Uptight (Everything's Alright)",       a:"Stevie Wonder",                         y:1966},
+  {r:126,t:"Isn't She Lovely",                     a:"Stevie Wonder",                         y:1976},
+  {r:127,t:"Master Blaster (Jammin')",             a:"Stevie Wonder",                         y:1980},
+  {r:128,t:"For Once in My Life",                  a:"Stevie Wonder",                         y:1968},
+  {r:129,t:"Inner City Blues (Make Me Wanna Holler)",a:"Marvin Gaye",                         y:1971},
+  {r:130,t:"Mercy Mercy Me (The Ecology)",         a:"Marvin Gaye",                           y:1971},
+  {r:131,t:"Sexual Healing",                       a:"Marvin Gaye",                           y:1982},
+  {r:132,t:"Let's Get It On",                      a:"Marvin Gaye",                           y:1973},
+  {r:133,t:"Ain't No Mountain High Enough",        a:"Marvin Gaye & Tammi Terrell",           y:1967},
+  {r:134,t:"C.R.E.A.M.",                           a:"Wu-Tang Clan",                          y:1993},
+  {r:135,t:"Protect Ya Neck",                      a:"Wu-Tang Clan",                          y:1993},
+  {r:136,t:"California Love",                      a:"2Pac feat. Dr. Dre",                    y:1995},
+  {r:137,t:"Changes",                              a:"2Pac",                                  y:1998},
+  {r:138,t:"Keep Ya Head Up",                      a:"2Pac",                                  y:1993},
+  {r:139,t:"Gin and Juice",                        a:"Snoop Dogg",                            y:1993},
+  {r:140,t:"Nuthin' But a G Thang",                a:"Dr. Dre feat. Snoop Dogg",              y:1992},
+  {r:141,t:"It Was a Good Day",                    a:"Ice Cube",                              y:1992},
+  {r:142,t:"Regulate",                             a:"Warren G feat. Nate Dogg",              y:1994},
+  {r:143,t:"Killing Me Softly",                    a:"Fugees",                                y:1996},
+  {r:144,t:"Ready or Not",                         a:"Fugees",                                y:1996},
+  {r:145,t:"HUMBLE.",                              a:"Kendrick Lamar",                        y:2017},
+  {r:146,t:"m.A.A.d city",                         a:"Kendrick Lamar feat. MC Eiht",          y:2012},
+  {r:147,t:"DNA.",                                 a:"Kendrick Lamar",                        y:2017},
+  {r:148,t:"Swimming Pools (Drank)",               a:"Kendrick Lamar",                        y:2012},
+  {r:149,t:"Can I Kick It?",                       a:"A Tribe Called Quest",                  y:1991},
+  {r:150,t:"Electric Relaxation",                  a:"A Tribe Called Quest",                  y:1993},
+  {r:151,t:"Check the Rhime",                      a:"A Tribe Called Quest",                  y:1991},
+  {r:152,t:"We Will Rock You",                     a:"Queen",                                 y:1977},
+  {r:153,t:"Somebody to Love",                     a:"Queen",                                 y:1976},
+  {r:154,t:"Don't Stop Me Now",                    a:"Queen",                                 y:1978},
+  {r:155,t:"Under Pressure",                       a:"Queen & David Bowie",                   y:1981},
+  {r:156,t:"Rock and Roll",                        a:"Led Zeppelin",                          y:1971},
+  {r:157,t:"Communication Breakdown",              a:"Led Zeppelin",                          y:1969},
+  {r:158,t:"The Immigrant Song",                   a:"Led Zeppelin",                          y:1970},
+  {r:159,t:"Ramble On",                            a:"Led Zeppelin",                          y:1969},
+  {r:160,t:"Good Times Bad Times",                 a:"Led Zeppelin",                          y:1969},
+  {r:161,t:"Desolation Row",                       a:"Bob Dylan",                             y:1965},
+  {r:162,t:"Hurricane",                            a:"Bob Dylan",                             y:1976},
+  {r:163,t:"Knockin' on Heaven's Door",            a:"Bob Dylan",                             y:1973},
+  {r:164,t:"The Thrill Is Gone",                   a:"B.B. King",                             y:1969},
+  {r:165,t:"Pride and Joy",                        a:"Stevie Ray Vaughan",                    y:1983},
+  {r:166,t:"Texas Flood",                          a:"Stevie Ray Vaughan",                    y:1983},
+  {r:167,t:"American Pie",                         a:"Don McLean",                            y:1971},
+  {r:168,t:"Piano Man",                            a:"Billy Joel",                            y:1973},
+  {r:169,t:"Son of a Preacher Man",                a:"Dusty Springfield",                     y:1968},
+  {r:170,t:"Da Doo Ron Ron",                       a:"The Crystals",                          y:1963},
+  {r:171,t:"Be My Baby",                           a:"The Ronettes",                          y:1963},
+  {r:172,t:"Will You Love Me Tomorrow",            a:"The Shirelles",                         y:1960},
+  {r:173,t:"Dedicated to the One I Love",          a:"The Shirelles",                         y:1961},
+  {r:174,t:"Please Mr. Postman",                   a:"The Marvelettes",                       y:1961},
+  {r:175,t:"Do You Love Me",                       a:"The Contours",                          y:1962},
+  {r:176,t:"Shop Around",                          a:"The Miracles",                          y:1960},
+  {r:177,t:"Tears of a Clown",                     a:"Smokey Robinson & The Miracles",        y:1970},
+  {r:178,t:"I Second That Emotion",                a:"Smokey Robinson & The Miracles",        y:1967},
+  {r:179,t:"War",                                  a:"Edwin Starr",                           y:1970},
+  {r:180,t:"Ball of Confusion",                    a:"The Temptations",                       y:1970},
+  {r:181,t:"Cloud Nine",                           a:"The Temptations",                       y:1968},
+  {r:182,t:"Just My Imagination",                  a:"The Temptations",                       y:1971},
+  {r:183,t:"Heat Wave",                            a:"Martha Reeves & the Vandellas",         y:1963},
+  {r:184,t:"For What It's Worth",                  a:"Buffalo Springfield",                   y:1967},
+  {r:185,t:"Suite: Judy Blue Eyes",                a:"Crosby, Stills & Nash",                 y:1969},
+  {r:186,t:"Ohio",                                 a:"Crosby, Stills, Nash & Young",          y:1970},
+  {r:187,t:"Heart of Gold",                        a:"Neil Young",                            y:1972},
+  {r:188,t:"Old Man",                              a:"Neil Young",                            y:1972},
+  {r:189,t:"Rockin' in the Free World",            a:"Neil Young",                            y:1989},
+  {r:190,t:"Cinnamon Girl",                        a:"Neil Young",                            y:1969},
+  {r:191,t:"The Needle and the Damage Done",       a:"Neil Young",                            y:1972},
+  {r:192,t:"After the Gold Rush",                  a:"Neil Young",                            y:1970},
+  {r:193,t:"Like a Hurricane",                     a:"Neil Young",                            y:1977},
+  {r:194,t:"I Will Always Love You",               a:"Dolly Parton",                          y:1974},
+  {r:195,t:"9 to 5",                               a:"Dolly Parton",                          y:1980},
+  {r:196,t:"Man in Black",                         a:"Johnny Cash",                           y:1971},
+  {r:197,t:"Jackson",                              a:"Johnny Cash & June Carter Cash",        y:1967},
+  {r:198,t:"Me and Bobby McGee",                   a:"Janis Joplin",                          y:1971},
+  {r:199,t:"Piece of My Heart",                    a:"Janis Joplin & Big Brother",            y:1968},
+  {r:200,t:"Cry Baby",                             a:"Janis Joplin",                          y:1971},
+  {r:201,t:"The Sound of Silence",                 a:"Simon & Garfunkel",                     y:1964},
+  {r:202,t:"Bridge Over Troubled Water",           a:"Simon & Garfunkel",                     y:1970},
+  {r:203,t:"Mrs. Robinson",                        a:"Simon & Garfunkel",                     y:1968},
+  {r:204,t:"America",                              a:"Simon & Garfunkel",                     y:1968},
+  {r:205,t:"The Boxer",                            a:"Simon & Garfunkel",                     y:1969},
+  {r:206,t:"Penny Lane",                           a:"The Beatles",                           y:1967},
+  {r:207,t:"Come Together",                        a:"The Beatles",                           y:1969},
+  {r:208,t:"Let It Be",                            a:"The Beatles",                           y:1970},
+  {r:209,t:"Norwegian Wood",                       a:"The Beatles",                           y:1965},
+  {r:210,t:"Help!",                                a:"The Beatles",                           y:1965},
+  {r:211,t:"Twist and Shout",                      a:"The Isley Brothers",                    y:1962},
+  {r:212,t:"Shout",                                a:"The Isley Brothers",                    y:1959},
+  {r:213,t:"This Old Heart of Mine",               a:"The Isley Brothers",                    y:1966},
+  {r:214,t:"In the Midnight Hour",                 a:"Wilson Pickett",                        y:1965},
+  {r:215,t:"Mustang Sally",                        a:"Wilson Pickett",                        y:1966},
+  {r:216,t:"Land of a Thousand Dances",            a:"Wilson Pickett",                        y:1966},
+  {r:217,t:"Try a Little Tenderness",              a:"Otis Redding",                          y:1966},
+  {r:218,t:"(Sittin' On) The Dock of the Bay",     a:"Otis Redding",                          y:1968},
+  {r:219,t:"I've Been Loving You Too Long",        a:"Otis Redding",                          y:1965},
+  {r:220,t:"These Arms of Mine",                   a:"Otis Redding",                          y:1963},
+  {r:221,t:"Knock on Wood",                        a:"Eddie Floyd",                           y:1966},
+  {r:222,t:"Hoochie Coochie Man",                  a:"Muddy Waters",                          y:1954},
+  {r:223,t:"Rollin' and Tumblin'",                 a:"Muddy Waters",                          y:1950},
+  {r:224,t:"Mannish Boy",                          a:"Muddy Waters",                          y:1955},
+  {r:225,t:"Got My Mojo Working",                  a:"Muddy Waters",                          y:1957},
+  {r:226,t:"Sweet Home Chicago",                   a:"Robert Johnson",                        y:1937},
+  {r:227,t:"Cross Road Blues",                     a:"Robert Johnson",                        y:1937},
+  {r:228,t:"Lucille",                              a:"B.B. King",                             y:1968},
+  {r:229,t:"Great Balls of Fire",                  a:"Jerry Lee Lewis",                       y:1957},
+  {r:230,t:"Whole Lotta Shakin' Goin' On",         a:"Jerry Lee Lewis",                       y:1957},
+  {r:231,t:"Good Golly Miss Molly",                a:"Little Richard",                        y:1958},
+  {r:232,t:"Long Tall Sally",                      a:"Little Richard",                        y:1956},
+  {r:233,t:"Blueberry Hill",                       a:"Fats Domino",                           y:1956},
+  {r:234,t:"Ain't That a Shame",                   a:"Fats Domino",                           y:1955},
+  {r:235,t:"Blue Monday",                          a:"Fats Domino",                           y:1956},
+  {r:236,t:"I'm Walkin'",                          a:"Fats Domino",                           y:1957},
+  {r:237,t:"Peggy Sue",                            a:"Buddy Holly",                           y:1957},
+  {r:238,t:"That'll Be the Day",                   a:"Buddy Holly",                           y:1957},
+  {r:239,t:"Not Fade Away",                        a:"Buddy Holly",                           y:1957},
+  {r:240,t:"Rave On",                              a:"Buddy Holly",                           y:1958},
+  {r:241,t:"Shake, Rattle and Roll",               a:"Big Joe Turner",                        y:1954},
+  {r:242,t:"Kansas City",                          a:"Wilbert Harrison",                      y:1959},
+  {r:243,t:"Leader of the Pack",                   a:"The Shangri-Las",                       y:1964},
+  {r:244,t:"Chapel of Love",                       a:"The Dixie Cups",                        y:1964},
+  {r:245,t:"Walking in the Rain",                  a:"The Ronettes",                          y:1964},
+  {r:246,t:"He's a Rebel",                         a:"The Crystals",                          y:1962},
+  {r:247,t:"Then He Kissed Me",                    a:"The Crystals",                          y:1963},
+  {r:248,t:"Baby It's You",                        a:"The Shirelles",                         y:1961},
+  {r:249,t:"Soldier Boy",                          a:"The Shirelles",                         y:1962},
+  {r:250,t:"Come a Little Bit Closer",             a:"Jay and the Americans",                 y:1964},
+  {r:251,t:"Sally Go 'Round the Roses",            a:"The Jaynettes",                         y:1963},
+  {r:252,t:"Uptown",                               a:"The Crystals",                          y:1962},
+  {r:253,t:"Don't Worry Baby",                     a:"The Beach Boys",                        y:1964},
+  {r:254,t:"California Girls",                     a:"The Beach Boys",                        y:1965},
+  {r:255,t:"Surfin' U.S.A.",                       a:"The Beach Boys",                        y:1963},
+  {r:256,t:"Fun, Fun, Fun",                        a:"The Beach Boys",                        y:1964},
+  {r:257,t:"I Get Around",                         a:"The Beach Boys",                        y:1964},
+  {r:258,t:"Pet Sounds",                           a:"The Beach Boys",                        y:1966},
+  {r:259,t:"Wouldn't It Be Nice",                  a:"The Beach Boys",                        y:1966},
+  {r:260,t:"Sloop John B",                         a:"The Beach Boys",                        y:1966},
+  {r:261,t:"Deuce",                                a:"KISS",                                  y:1974},
+  {r:262,t:"Rock and Roll All Nite",               a:"KISS",                                  y:1975},
+  {r:263,t:"Pinball Wizard",                       a:"The Who",                               y:1969},
+  {r:264,t:"Behind Blue Eyes",                     a:"The Who",                               y:1971},
+  {r:265,t:"I Can See for Miles",                  a:"The Who",                               y:1967},
+  {r:266,t:"Magic Bus",                            a:"The Who",                               y:1968},
+  {r:267,t:"The Real Me",                          a:"The Who",                               y:1973},
+  {r:268,t:"Rebel Rebel",                          a:"David Bowie",                           y:1974},
+  {r:269,t:"Suffragette City",                     a:"David Bowie",                           y:1972},
+  {r:270,t:"Young Americans",                      a:"David Bowie",                           y:1975},
+  {r:271,t:"Let's Dance",                          a:"David Bowie",                           y:1983},
+  {r:272,t:"Fame",                                 a:"David Bowie",                           y:1975},
+  {r:273,t:"Golden Years",                         a:"David Bowie",                           y:1975},
+  {r:274,t:"Another Brick in the Wall (Part II)",  a:"Pink Floyd",                            y:1979},
+  {r:275,t:"Time",                                 a:"Pink Floyd",                            y:1973},
+  {r:276,t:"Us and Them",                          a:"Pink Floyd",                            y:1973},
+  {r:277,t:"One of These Days",                    a:"Pink Floyd",                            y:1971},
+  {r:278,t:"Breathe",                              a:"Pink Floyd",                            y:1973},
+  {r:279,t:"Hey Joe",                              a:"Jimi Hendrix Experience",               y:1966},
+  {r:280,t:"Fire",                                 a:"Jimi Hendrix Experience",               y:1967},
+  {r:281,t:"The Wind Cries Mary",                  a:"Jimi Hendrix Experience",               y:1967},
+  {r:282,t:"Foxy Lady",                            a:"Jimi Hendrix Experience",               y:1967},
+  {r:283,t:"Manic Depression",                     a:"Jimi Hendrix Experience",               y:1967},
+  {r:284,t:"My Favorite Things",                   a:"John Coltrane",                         y:1961},
+  {r:285,t:"So What",                              a:"Miles Davis",                           y:1959},
+  {r:286,t:"Take Five",                            a:"Dave Brubeck Quartet",                  y:1959},
+  {r:287,t:"Summertime",                           a:"Ella Fitzgerald & Louis Armstrong",     y:1950},
+  {r:288,t:"Blue in Green",                        a:"Miles Davis",                           y:1959},
+  {r:289,t:"Autumn Leaves",                        a:"Cannonball Adderley",                   y:1958},
+  {r:290,t:"What a Wonderful World",               a:"Louis Armstrong",                       y:1967},
+  {r:291,t:"La Bamba",                             a:"Ritchie Valens",                        y:1958},
+  {r:292,t:"Oh! Darling",                          a:"The Beatles",                           y:1969},
+  {r:293,t:"Something",                            a:"The Beatles",                           y:1969},
+  {r:294,t:"While My Guitar Gently Weeps",         a:"The Beatles",                           y:1968},
+  {r:295,t:"Blackbird",                            a:"The Beatles",                           y:1968},
+  {r:296,t:"Revolution",                           a:"The Beatles",                           y:1968},
+  {r:297,t:"Back in the U.S.S.R.",                 a:"The Beatles",                           y:1968},
+  {r:298,t:"Ob-La-Di, Ob-La-Da",                   a:"The Beatles",                           y:1968},
+  {r:299,t:"With a Little Help from My Friends",   a:"The Beatles",                           y:1967},
+  {r:300,t:"Lucy in the Sky with Diamonds",        a:"The Beatles",                           y:1967},
+  {r:301,t:"Sgt. Pepper's Lonely Hearts Club Band",a:"The Beatles",                           y:1967},
+  {r:302,t:"Let It Bleed",                         a:"The Rolling Stones",                    y:1969},
+  {r:303,t:"Street Fighting Man",                  a:"The Rolling Stones",                    y:1968},
+  {r:304,t:"Paint It Black",                       a:"The Rolling Stones",                    y:1966},
+  {r:305,t:"19th Nervous Breakdown",               a:"The Rolling Stones",                    y:1966},
+  {r:306,t:"Get Off of My Cloud",                  a:"The Rolling Stones",                    y:1965},
+  {r:307,t:"Ruby Tuesday",                         a:"The Rolling Stones",                    y:1967},
+  {r:308,t:"Wild Horses",                          a:"The Rolling Stones",                    y:1971},
+  {r:309,t:"Angie",                                a:"The Rolling Stones",                    y:1973},
+  {r:310,t:"Start Me Up",                          a:"The Rolling Stones",                    y:1981},
+  {r:311,t:"Miss You",                             a:"The Rolling Stones",                    y:1978},
+  {r:312,t:"Jumpin' Jack Flash",                   a:"The Rolling Stones",                    y:1968},
+  {r:313,t:"Honky Tonk Women",                     a:"The Rolling Stones",                    y:1969},
+  {r:314,t:"Happy",                                a:"The Rolling Stones",                    y:1972},
+  {r:315,t:"Little Red Rooster",                   a:"The Rolling Stones",                    y:1964},
+  {r:316,t:"Midnight Rambler",                     a:"The Rolling Stones",                    y:1969},
+  {r:317,t:"The Last Time",                        a:"The Rolling Stones",                    y:1965},
+  {r:318,t:"Mother's Little Helper",               a:"The Rolling Stones",                    y:1966},
+  {r:319,t:"Time Is on My Side",                   a:"The Rolling Stones",                    y:1964},
+  {r:320,t:"Tell Me",                              a:"The Rolling Stones",                    y:1964},
+  {r:321,t:"Mannish Boy",                          a:"The Rolling Stones",                    y:1965},
+  {r:322,t:"Gimme Shelter (Alternate)",            a:"The Rolling Stones",                    y:1969},
+  {r:323,t:"Heart of Gold",                        a:"Neil Young",                            y:1972},
+  {r:324,t:"Harvest",                              a:"Neil Young",                            y:1972},
+  {r:325,t:"Southern Man",                         a:"Neil Young",                            y:1970},
+  {r:326,t:"Hey Hey, My My (Into the Black)",      a:"Neil Young",                            y:1979},
+  {r:327,t:"Long May You Run",                     a:"Neil Young",                            y:1976},
+  {r:328,t:"Helpless",                             a:"Crosby, Stills, Nash & Young",          y:1970},
+  {r:329,t:"Our House",                            a:"Crosby, Stills, Nash & Young",          y:1970},
+  {r:330,t:"Teach Your Children",                  a:"Crosby, Stills, Nash & Young",          y:1970},
+  {r:331,t:"Woodstock",                            a:"Crosby, Stills, Nash & Young",          y:1970},
+  {r:332,t:"Blackbird (Neil Young cover)",         a:"Crosby, Stills, Nash & Young",          y:1970},
+  {r:333,t:"Take It Easy",                         a:"Eagles",                                y:1972},
+  {r:334,t:"Desperado",                            a:"Eagles",                                y:1973},
+  {r:335,t:"One of These Nights",                  a:"Eagles",                                y:1975},
+  {r:336,t:"Life in the Fast Lane",                a:"Eagles",                                y:1977},
+  {r:337,t:"Lyin' Eyes",                           a:"Eagles",                                y:1975},
+  {r:338,t:"New Kid in Town",                      a:"Eagles",                                y:1976},
+  {r:339,t:"Heartache Tonight",                    a:"Eagles",                                y:1979},
+  {r:340,t:"The Long Run",                         a:"Eagles",                                y:1979},
+  {r:341,t:"Every Breath You Take",                a:"The Police",                            y:1983},
+  {r:342,t:"Message in a Bottle",                  a:"The Police",                            y:1979},
+  {r:343,t:"Don't Stand So Close to Me",           a:"The Police",                            y:1980},
+  {r:344,t:"Walking on the Moon",                  a:"The Police",                            y:1979},
+  {r:345,t:"Wrapped Around Your Finger",           a:"The Police",                            y:1983},
+  {r:346,t:"De Do Do Do, De Da Da Da",             a:"The Police",                            y:1980},
+  {r:347,t:"Synchronicity II",                     a:"The Police",                            y:1983},
+  {r:348,t:"So Lonely",                            a:"The Police",                            y:1978},
+  {r:349,t:"Roxanne (live)",                       a:"The Police",                            y:1979},
+  {r:350,t:"When the World Is Running Down",       a:"The Police",                            y:1980},
+  {r:351,t:"Livin' on a Prayer",                   a:"Bon Jovi",                              y:1986},
+  {r:352,t:"Wanted Dead or Alive",                 a:"Bon Jovi",                              y:1987},
+  {r:353,t:"You Give Love a Bad Name",             a:"Bon Jovi",                              y:1986},
+  {r:354,t:"It's My Life",                         a:"Bon Jovi",                              y:2000},
+  {r:355,t:"Sweet Child O' Mine",                  a:"Guns N' Roses",                         y:1988},
+  {r:356,t:"Welcome to the Jungle",                a:"Guns N' Roses",                         y:1987},
+  {r:357,t:"November Rain",                        a:"Guns N' Roses",                         y:1991},
+  {r:358,t:"Paradise City",                        a:"Guns N' Roses",                         y:1988},
+  {r:359,t:"Mr. Brightside",                       a:"The Killers",                           y:2003},
+  {r:360,t:"Somebody Told Me",                     a:"The Killers",                           y:2004},
+  {r:361,t:"Teenage Dirtbag",                      a:"Wheatus",                               y:2000},
+  {r:362,t:"In Bloom",                             a:"Nirvana",                               y:1991},
+  {r:363,t:"Come as You Are",                      a:"Nirvana",                               y:1991},
+  {r:364,t:"Heart-Shaped Box",                     a:"Nirvana",                               y:1993},
+  {r:365,t:"Lithium",                              a:"Nirvana",                               y:1991},
+  {r:366,t:"About a Girl",                         a:"Nirvana",                               y:1989},
+  {r:367,t:"Polly",                                a:"Nirvana",                               y:1991},
+  {r:368,t:"Rape Me",                              a:"Nirvana",                               y:1993},
+  {r:369,t:"Teen Spirit",                          a:"Nirvana",                               y:1991},
+  {r:370,t:"Territorial Pissings",                 a:"Nirvana",                               y:1991},
+  {r:371,t:"Creep",                                a:"Radiohead",                             y:1992},
+  {r:372,t:"Karma Police",                         a:"Radiohead",                             y:1997},
+  {r:373,t:"Fake Plastic Trees",                   a:"Radiohead",                             y:1995},
+  {r:374,t:"Paranoid Android",                     a:"Radiohead",                             y:1997},
+  {r:375,t:"No Surprises",                         a:"Radiohead",                             y:1997},
+  {r:376,t:"Everlong",                             a:"Foo Fighters",                          y:1997},
+  {r:377,t:"Best of You",                          a:"Foo Fighters",                          y:2005},
+  {r:378,t:"All My Life",                          a:"Foo Fighters",                          y:2002},
+  {r:379,t:"Monkey Wrench",                        a:"Foo Fighters",                          y:1997},
+  {r:380,t:"Learn to Fly",                         a:"Foo Fighters",                          y:1999},
+  {r:381,t:"Waterfalls",                           a:"TLC",                                   y:1995},
+  {r:382,t:"Creep",                                a:"TLC",                                   y:1992},
+  {r:383,t:"Unpretty",                             a:"TLC",                                   y:1999},
+  {r:384,t:"No Doubt",                             a:"No Doubt",                              y:2000},
+  {r:385,t:"Don't Speak",                          a:"No Doubt",                              y:1996},
+  {r:386,t:"Just a Girl",                          a:"No Doubt",                              y:1995},
+  {r:387,t:"Spiderwebs",                           a:"No Doubt",                              y:1995},
+  {r:388,t:"Hella Good",                           a:"No Doubt",                              y:2001},
+  {r:389,t:"Buddy Holly",                          a:"Weezer",                                y:1994},
+  {r:390,t:"Undone – The Sweater Song",            a:"Weezer",                                y:1994},
+  {r:391,t:"Say It Ain't So",                      a:"Weezer",                                y:1994},
+  {r:392,t:"Glycerine",                            a:"Bush",                                  y:1994},
+  {r:393,t:"Cannonball",                           a:"The Breeders",                          y:1993},
+  {r:394,t:"Debaser",                              a:"Pixies",                                y:1989},
+  {r:395,t:"Where Is My Mind?",                    a:"Pixies",                                y:1988},
+  {r:396,t:"Here Comes Your Man",                  a:"Pixies",                                y:1989},
+  {r:397,t:"Gigantic",                             a:"Pixies",                                y:1988},
+  {r:398,t:"Monkey Gone to Heaven",                a:"Pixies",                                y:1989},
+  {r:399,t:"Hey",                                  a:"Pixies",                                y:1989},
+  {r:400,t:"Gouge Away",                           a:"Pixies",                                y:1989},
+  {r:401,t:"Yoshimi Battles the Pink Robots Pt. 1",a:"The Flaming Lips",                     y:2002},
+  {r:402,t:"She Don't Use Jelly",                  a:"The Flaming Lips",                     y:1993},
+  {r:403,t:"Do You Realize??",                     a:"The Flaming Lips",                     y:2002},
+  {r:404,t:"Teenage Wasteland",                    a:"The Who",                               y:1971},
+  {r:405,t:"Love in an Elevator",                  a:"Aerosmith",                             y:1989},
+  {r:406,t:"Dream On",                             a:"Aerosmith",                             y:1973},
+  {r:407,t:"Sweet Emotion",                        a:"Aerosmith",                             y:1975},
+  {r:408,t:"Dude (Looks Like a Lady)",             a:"Aerosmith",                             y:1987},
+  {r:409,t:"Train Kept A-Rollin'",                 a:"Aerosmith",                             y:1974},
+  {r:410,t:"Back in Black",                        a:"AC/DC",                                 y:1980},
+  {r:411,t:"Highway to Hell",                      a:"AC/DC",                                 y:1979},
+  {r:412,t:"Thunderstruck",                        a:"AC/DC",                                 y:1990},
+  {r:413,t:"You Shook Me All Night Long",          a:"AC/DC",                                 y:1980},
+  {r:414,t:"TNT",                                  a:"AC/DC",                                 y:1976},
+  {r:415,t:"Hells Bells",                          a:"AC/DC",                                 y:1980},
+  {r:416,t:"God's Plan",                           a:"Drake",                                 y:2018},
+  {r:417,t:"Hotline Bling",                        a:"Drake",                                 y:2015},
+  {r:418,t:"One Dance",                            a:"Drake",                                 y:2016},
+  {r:419,t:"Started from the Bottom",              a:"Drake",                                 y:2013},
+  {r:420,t:"Bad Guy",                              a:"Billie Eilish",                         y:2019},
+  {r:421,t:"Everything I Wanted",                  a:"Billie Eilish",                         y:2019},
+  {r:422,t:"When the Party's Over",                a:"Billie Eilish",                         y:2018},
+  {r:423,t:"Happier Than Ever",                    a:"Billie Eilish",                         y:2021},
+  {r:424,t:"Dynamite",                             a:"BTS",                                   y:2020},
+  {r:425,t:"Butter",                               a:"BTS",                                   y:2021},
+  {r:426,t:"Old Town Road",                        a:"Lil Nas X feat. Billy Ray Cyrus",       y:2019},
+  {r:427,t:"Montero (Call Me by Your Name)",       a:"Lil Nas X",                             y:2021},
+  {r:428,t:"Levitating",                           a:"Dua Lipa",                              y:2020},
+  {r:429,t:"Don't Start Now",                      a:"Dua Lipa",                              y:2019},
+  {r:430,t:"Physical",                             a:"Dua Lipa",                              y:2020},
+  {r:431,t:"Shake It Off",                         a:"Taylor Swift",                          y:2014},
+  {r:432,t:"Love Story",                           a:"Taylor Swift",                          y:2008},
+  {r:433,t:"You Belong with Me",                   a:"Taylor Swift",                          y:2009},
+  {r:434,t:"cardigan",                             a:"Taylor Swift",                          y:2020},
+  {r:435,t:"Anti-Hero",                            a:"Taylor Swift",                          y:2022},
+  {r:436,t:"Blank Space",                          a:"Taylor Swift",                          y:2014},
+  {r:437,t:"Bad Blood",                            a:"Taylor Swift",                          y:2015},
+  {r:438,t:"Cruel Summer",                         a:"Taylor Swift",                          y:2019},
+  {r:439,t:"Rockstar",                             a:"Post Malone feat. 21 Savage",           y:2017},
+  {r:440,t:"Sunflower",                            a:"Post Malone & Swae Lee",                y:2018},
+  {r:441,t:"Circles",                              a:"Post Malone",                           y:2019},
+  {r:442,t:"GOOSEBUMPS",                           a:"Travis Scott",                          y:2016},
+  {r:443,t:"Sicko Mode",                           a:"Travis Scott",                          y:2018},
+  {r:444,t:"Mask Off",                             a:"Future",                                y:2017},
+  {r:445,t:"XO TOUR Llif3",                        a:"Lil Uzi Vert",                          y:2017},
+  {r:446,t:"Lucid Dreams",                         a:"Juice WRLD",                            y:2018},
+  {r:447,t:"LOVE.",                                a:"Kendrick Lamar feat. Zacari",           y:2017},
+  {r:448,t:"Alright",                              a:"Kendrick Lamar",                        y:2015},
+  {r:449,t:"Money Trees",                          a:"Kendrick Lamar feat. Jay Rock",         y:2012},
+  {r:450,t:"Poetic Justice",                       a:"Kendrick Lamar feat. Drake",            y:2012},
+  {r:451,t:"Black Skinhead",                       a:"Kanye West",                            y:2013},
+  {r:452,t:"Power",                                a:"Kanye West",                            y:2010},
+  {r:453,t:"Gold Digger",                          a:"Kanye West feat. Jamie Foxx",           y:2005},
+  {r:454,t:"Stronger",                             a:"Kanye West",                            y:2007},
+  {r:455,t:"All Falls Down",                       a:"Kanye West",                            y:2004},
+  {r:456,t:"Through the Wire",                     a:"Kanye West",                            y:2003},
+  {r:457,t:"Hey Ya!",                              a:"OutKast",                               y:2003},
+  {r:458,t:"Ms. Jackson",                          a:"OutKast",                               y:2000},
+  {r:459,t:"B.O.B.",                               a:"OutKast",                               y:2000},
+  {r:460,t:"Rosa Parks",                           a:"OutKast",                               y:1998},
+  {r:461,t:"Spottieottiedopaliscious",              a:"OutKast",                               y:1998},
+  {r:462,t:"ATLiens",                              a:"OutKast",                               y:1996},
+  {r:463,t:"Elevators (Me & You)",                 a:"OutKast",                               y:1996},
+  {r:464,t:"One Love",                             a:"Bob Marley & The Wailers",              y:1977},
+  {r:465,t:"No Woman, No Cry",                     a:"Bob Marley & The Wailers",              y:1975},
+  {r:466,t:"Get Up, Stand Up",                     a:"Bob Marley & The Wailers",              y:1973},
+  {r:467,t:"Three Little Birds",                   a:"Bob Marley & The Wailers",              y:1980},
+  {r:468,t:"Is This Love",                         a:"Bob Marley & The Wailers",              y:1978},
+  {r:469,t:"Buffalo Soldier",                      a:"Bob Marley & The Wailers",              y:1983},
+  {r:470,t:"I Shot the Sheriff",                   a:"Bob Marley & The Wailers",              y:1973},
+  {r:471,t:"Jamming",                              a:"Bob Marley & The Wailers",              y:1977},
+  {r:472,t:"Waiting in Vain",                      a:"Bob Marley & The Wailers",              y:1977},
+  {r:473,t:"Could You Be Loved",                   a:"Bob Marley & The Wailers",              y:1980},
+  {r:474,t:"Exodus",                               a:"Bob Marley & The Wailers",              y:1977},
+  {r:475,t:"I Shot the Sheriff",                   a:"Eric Clapton",                          y:1974},
+  {r:476,t:"Layla",                                a:"Derek and the Dominos",                 y:1970},
+  {r:477,t:"Cocaine",                              a:"Eric Clapton",                          y:1977},
+  {r:478,t:"Wonderful Tonight",                    a:"Eric Clapton",                          y:1977},
+  {r:479,t:"Tears in Heaven",                      a:"Eric Clapton",                          y:1992},
+  {r:480,t:"Lay Down Sally",                       a:"Eric Clapton",                          y:1977},
+  {r:481,t:"Crossroads",                           a:"Cream",                                 y:1968},
+  {r:482,t:"Sunshine of Your Love",                a:"Cream",                                 y:1967},
+  {r:483,t:"White Room",                           a:"Cream",                                 y:1968},
+  {r:484,t:"Badge",                                a:"Cream",                                 y:1969},
+  {r:485,t:"Strange Brew",                         a:"Cream",                                 y:1967},
+  {r:486,t:"Dancing Days",                         a:"Led Zeppelin",                          y:1973},
+  {r:487,t:"Over the Hills and Far Away",          a:"Led Zeppelin",                          y:1973},
+  {r:488,t:"Bring It On Home",                     a:"Led Zeppelin",                          y:1969},
+  {r:489,t:"Tangerine",                            a:"Led Zeppelin",                          y:1970},
+  {r:490,t:"The Rain Song",                        a:"Led Zeppelin",                          y:1973},
+  {r:491,t:"No Quarter",                           a:"Led Zeppelin",                          y:1973},
+  {r:492,t:"In the Evening",                       a:"Led Zeppelin",                          y:1979},
+  {r:493,t:"Fool in the Rain",                     a:"Led Zeppelin",                          y:1979},
+  {r:494,t:"Hot Dog",                              a:"Led Zeppelin",                          y:1979},
+  {r:495,t:"Babe I'm Gonna Leave You",             a:"Led Zeppelin",                          y:1969},
+  {r:496,t:"Your Time Is Gonna Come",              a:"Led Zeppelin",                          y:1969},
+  {r:497,t:"Gallows Pole",                         a:"Led Zeppelin",                          y:1970},
+  {r:498,t:"Four Sticks",                          a:"Led Zeppelin",                          y:1971},
+  {r:499,t:"The Ocean",                            a:"Led Zeppelin",                          y:1973},
+  {r:500,t:"Carouselambra",                        a:"Led Zeppelin",                          y:1979},
+];
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let currentIdx = -1;
+let source = 'yt';
+let filtered = SONGS.slice();
+
+// ── UI ───────────────────────────────────────────────────────────────────────
+function setSource(s) {
+  source = s;
+  document.getElementById('tab-yt').classList.toggle('active', s === 'yt');
+  document.getElementById('tab-sp').classList.toggle('active', s === 'sp');
+  document.getElementById('yt-wrap').classList.toggle('hidden', s !== 'yt');
+  document.getElementById('sp-wrap').classList.toggle('hidden', s !== 'sp');
+  document.getElementById('yt-open').style.display = s === 'yt' ? '' : 'none';
+}
+
+function ytSearchUrl(song) {
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(song.a + ' ' + song.t);
+}
+
+function ytEmbedUrl(song) {
+  const q = encodeURIComponent(song.a + ' ' + song.t + ' official');
+  return 'https://www.youtube.com/embed?listType=search&list=' + q + '&autoplay=1&rel=0&index=0';
+}
+
+function playSong(idx) {
+  const song = filtered[idx];
+  if (!song) return;
+  currentIdx = idx;
+
+  // Update now bar
+  document.getElementById('now-rank').textContent = song.r;
+  document.getElementById('now-title').textContent = song.t;
+  document.getElementById('now-artist').innerHTML = song.a + '<span id="now-year"> · ' + song.y + '</span>';
+
+  // YouTube embed
+  const frame = document.getElementById('yt-frame');
+  frame.src = ytEmbedUrl(song);
+
+  // Open in YouTube link
+  const lnk = document.getElementById('yt-open');
+  lnk.href = ytSearchUrl(song);
+  lnk.style.display = '';
+
+  // Highlight row
+  document.querySelectorAll('.song-row').forEach(function(r, i) {
+    r.classList.toggle('playing', i === idx);
+  });
+
+  // Scroll active row into view
+  const rows = document.querySelectorAll('.song-row');
+  if (rows[idx]) rows[idx].scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+
+function skip(dir) {
+  const next = currentIdx + dir;
+  if (next >= 0 && next < filtered.length) playSong(next);
+}
+
+function filterList(query) {
+  const raw = query.trim();
+  let re = null;
+  if (raw) { try { re = new RegExp(raw, 'i'); } catch(e) { re = new RegExp(raw.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'), 'i'); } }
+  filtered = re ? SONGS.filter(function(s) { return re.test(s.t) || re.test(s.a); }) : SONGS.slice();
+  renderList();
+  document.getElementById('count-label').textContent = filtered.length + ' of 500';
+  if (currentIdx >= filtered.length) currentIdx = -1;
+}
+
+function renderList() {
+  const list = document.getElementById('list');
+  list.innerHTML = filtered.map(function(s, i) {
+    return '<div class="song-row' + (i === currentIdx ? ' playing' : '') + '" onclick="playSong(' + i + ')">' +
+      '<span class="s-rank">' + s.r + '</span>' +
+      '<span class="s-title">' + esc(s.t) + '</span>' +
+      '<span class="s-artist">' + esc(s.a) + '</span>' +
+      '<span class="s-year">' + s.y + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+renderList();
+// Set initial YouTube iframe src to empty (avoid autoplay on load)
+document.getElementById('yt-frame').src = 'about:blank';
+</script>
+</body>
+</html>
