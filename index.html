@@ -179,6 +179,7 @@
   <div id="stage">
     <div class="logo-tip"><div class="brand">Bedtime Tunes<small>tunes to snooze to</small></div>
       <span class="tip">for you my friend &middot; Pedro &middot; Pit &#x271D; &lt;3</span></div>
+    <a href="/greatest500" style="font-family:'Barlow',sans-serif;font-size:.5rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.38);text-decoration:none;border:1px solid rgba(255,255,255,.12);border-radius:100px;padding:.28rem .8rem;transition:all .2s;display:inline-block" onmouseover="this.style.color='rgba(255,255,255,.75)';this.style.borderColor='rgba(255,255,255,.3)'" onmouseout="this.style.color='rgba(255,255,255,.38)';this.style.borderColor='rgba(255,255,255,.12)'">not bedtime &rarr; RS 500</a>
 
     <div class="now">
       <div class="media">
@@ -339,7 +340,7 @@ let ytPlayer=null, ytReady=false, spCtrl=null, spReady=false, spAdvanced=false;
 const fmt=s=>{s=Math.floor(s||0);return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`};
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const sourceOf=t=> t.mp3_key?'mp3' : t.youtube_id?'youtube' : t.spotify_id?'spotify' : null;
-const slug=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+const slug=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 const pathFor=t=>`${t.id}-${slug(t.title)}-${slug(t.artist)}`;   // 147-honey-bee-zee-avi
 const hashFor=t=>`#${pathFor(t)}`;
 const srcIcon=s=> s==='mp3'?'♪' : s==='youtube'?'▶' : s==='spotify'?'⠿' : '·';
